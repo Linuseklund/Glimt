@@ -164,6 +164,25 @@ select{appearance:none;-webkit-appearance:none;height:40px;border-radius:10px;bo
 input[type=range]{width:100%;accent-color:var(--led);height:28px}
 .hint{margin:0;font-size:12px;line-height:1.5;color:var(--dim)}
 @media (max-width:420px){ .row2{grid-template-columns:1fr} }
+/* ---------- tracks + mixer ---------- */
+#tracks .card{max-width:min(1100px, 100%)}
+.mixer-wrap{overflow-x:auto;margin-inline:-8px;padding:4px 8px 10px;-webkit-overflow-scrolling:touch}
+.mixer{display:flex;gap:6px;width:max-content;margin-inline:auto}
+.ch{width:52px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0 8px;border-radius:12px;background:var(--rail);border:1px solid var(--line)}
+.ch.bus{background:var(--raise);margin-right:6px}
+.ch .led{width:8px;height:8px;border-radius:50%;background:var(--amber);opacity:0;box-shadow:0 0 8px var(--amber)}
+.ch.melc .led,.ch.bus .led{background:var(--led);box-shadow:0 0 8px var(--led)}
+.ch output{font:600 11px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.fader{position:relative;width:28px;height:clamp(150px, 34vh, 260px);border-radius:8px;background:var(--panel);border:1px solid var(--line);touch-action:none;cursor:ns-resize}
+.fader:focus-visible{outline:2px solid var(--led);outline-offset:3px}
+.fader .fill{position:absolute;left:4px;right:4px;bottom:4px;border-radius:4px;background:linear-gradient(to top, rgba(191,239,255,.18), rgba(191,239,255,.7))}
+.ch.drum .fader .fill{background:linear-gradient(to top, rgba(255,179,92,.15), rgba(255,179,92,.7))}
+.fader .unity{position:absolute;left:-5px;right:-5px;height:1px;background:var(--dim)}
+.fader .cap{position:absolute;left:-6px;right:-6px;height:12px;border-radius:4px;background:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.6);transform:translateY(50%)}
+.ch .nm{margin-top:auto;font:600 9px var(--font-mono);letter-spacing:.04em;color:var(--ink);white-space:nowrap;max-width:48px;overflow:hidden;text-overflow:ellipsis}
+.ch.drum:not(.used) .nm{color:var(--dim)}
+.ch.muted .fill,.ch.muted .cap{opacity:.3}
+.ch .chip{height:28px;min-width:32px;padding:0 8px}
 /* ---------- tracks ---------- */
 .trk-list{display:flex;flex-direction:column;gap:6px}
 .trk{border:1px solid var(--line);border-radius:12px;background:var(--rail)}
@@ -257,8 +276,15 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
 <div class="overlay sheet" id="tracks" hidden>
   <div class="card" role="dialog" aria-label="Spår">
     <div class="sheet-head"><h2>Spår</h2><button class="btn" id="closeTracks">Klar</button></div>
-    <p class="hint">Tryck på ett spår för att justera ljudet. M tystar spåret i slingan, Rensa tar bort det som är inspelat på spåret.</p>
-    <div class="trk-list" id="trackList"></div>
+    <div class="seg" id="trkTabs"></div>
+    <div id="mixerView">
+      <p class="hint">Dra en fader upp eller ner, dubbeltryck för att återställa. M tystar instrumentet i slingan och lampan blinkar när det spelar. Svep i sidled för fler instrument.</p>
+      <div class="mixer-wrap"><div class="mixer" id="mixer"></div></div>
+    </div>
+    <div id="listView" hidden>
+      <p class="hint">Tryck på ett spår för att justera ljudet. M tystar spåret i slingan, Rensa tar bort det som är inspelat på spåret.</p>
+      <div class="trk-list" id="trackList"></div>
+    </div>
   </div>
 </div>
 
@@ -377,7 +403,7 @@ const freq = m => 440 * Math.pow(2, (m - 69) / 12);
 const nameOf = m => NOTE_NAMES[((Math.round(m) % 12) + 12) % 12] + (Math.floor(Math.round(m) / 12) - 1);
 
 /* ---------------- audio ---------------- */
-let ac = null, master, voiceBus, drumBus, kitFilt, kitShaper, revSend, noiseBuf;
+let ac = null, master, voiceBus, drumBus, drumOut, kitFilt, kitShaper, revSend, noiseBuf;
 function makeIR(sec){
   const len = Math.floor(ac.sampleRate * sec), buf = ac.createBuffer(2, len, ac.sampleRate);
   for (let c = 0; c < 2; c++){ const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3.2); }
@@ -407,7 +433,7 @@ function ensureAudio(){
     drumBus = ac.createGain(); drumBus.gain.value = 0.95;
     kitFilt = ac.createBiquadFilter(); kitFilt.type = 'lowpass'; kitFilt.Q.value = 0.5;
     kitShaper = ac.createWaveShaper();
-    const drumOut = ac.createGain(); drumOut.gain.value = 1;
+    drumOut = ac.createGain(); drumOut.gain.value = state.drumVol;
     drumBus.connect(kitShaper); kitShaper.connect(kitFilt); kitFilt.connect(drumOut); drumOut.connect(master);
     const conv = ac.createConvolver(); conv.buffer = makeIR(2.6);
     revSend = ac.createGain(); revSend.gain.value = state.reverb;
@@ -569,6 +595,7 @@ if (state.steps === 32 && secondHalfEmpty()) copyFirstHalf();
 state.human = clamp(+state.human || 0, 0, 1);
 const TRK_DEFAULT = () => ({ vol:1, tune:0, dec:1, mute:false });
 const SYN_DEFAULT = () => ({ vol:1, cut:0, res:1, len:1, mute:false });
+state.drumVol = clamp(Number.isFinite(+state.drumVol) ? +state.drumVol : 1, 0, 1.5);
 state.trk = Array.from({ length:16 }, (_, i) => {
   const t = Array.isArray(state.trk) && state.trk[i] || {};
   return { vol:clamp(+t.vol || 1, 0, 1.5), tune:clamp(+t.tune || 0, -12, 12), dec:clamp(+t.dec || 1, 0.3, 2.5), mute:!!t.mute };
@@ -982,6 +1009,7 @@ function frame(now){
     }
   });
   g.globalCompositeOperation = 'source-over';
+  if (updateMixLeds()) anim = anim || seq.playing;
   if (touches.size || ripples.length || anim || seq.playing) requestFrame();
 }
 
@@ -1138,7 +1166,88 @@ function renderTracks(){
     list.append(row);
   });
 }
-$('#tracksBtn').addEventListener('click', () => { renderTracks(); $('#tracks').hidden = false; });
+let trkTab = 'mixer', mixLeds = [];
+function renderTrkTabs(){ seg($('#trkTabs'), [['mixer', 'Mixer'], ['list', 'Spår och ljud']], trkTab, v => { trkTab = v; renderTrkTabs(); showTrk(); }); }
+function showTrk(){ $('#mixerView').hidden = trkTab !== 'mixer'; $('#listView').hidden = trkTab !== 'list'; trkTab === 'mixer' ? renderMixer() : renderTracks(); }
+
+function fader(ch, onChange, onRelease){
+  const f = document.createElement('div'); f.className = 'fader'; f.tabIndex = 0; f.setAttribute('role', 'slider');
+  f.setAttribute('aria-label', 'Volym ' + ch.name); f.setAttribute('aria-valuemin', '0'); f.setAttribute('aria-valuemax', String(Math.round(ch.max * 100)));
+  f.innerHTML = `<div class="unity" style="bottom:calc(4px + ${100 / ch.max}% - ${8 / ch.max}px)"></div><div class="fill"></div><div class="cap"></div>`;
+  const fill = f.querySelector('.fill'), cap = f.querySelector('.cap');
+  const show = v => {
+    const k = v / ch.max;
+    fill.style.height = `calc((100% - 8px) * ${k})`; cap.style.bottom = `calc(4px + (100% - 8px) * ${k})`;
+    f.setAttribute('aria-valuenow', String(Math.round(v * 100))); f.setAttribute('aria-valuetext', Math.round(v * 100) + ' %');
+  };
+  const set = v => { v = clamp(Math.round(v * 100) / 100, 0, ch.max); show(v); onChange(v); };
+  const fromY = e => { const r = f.getBoundingClientRect(); return (1 - (e.clientY - r.top - 4) / (r.height - 8)) * ch.max; };
+  let drag = false, lastTap = 0;
+  f.addEventListener('pointerdown', e => {
+    e.preventDefault(); f.focus();
+    const now = performance.now();
+    if (now - lastTap < 300){ set(ch.unity); lastTap = 0; onRelease(); return; }
+    lastTap = now; drag = true; try { f.setPointerCapture(e.pointerId); } catch (err) {}
+    set(fromY(e));
+  });
+  f.addEventListener('pointermove', e => { if (drag) set(fromY(e)); });
+  const up = () => { if (drag){ drag = false; onRelease(); } };
+  f.addEventListener('pointerup', up); f.addEventListener('pointercancel', up);
+  f.addEventListener('keydown', e => {
+    const step = { ArrowUp:0.05, ArrowRight:0.05, ArrowDown:-0.05, ArrowLeft:-0.05 }[e.key];
+    if (step){ e.preventDefault(); set(ch.get() + step); onRelease(); }
+  });
+  show(ch.get());
+  return f;
+}
+function renderMixer(){
+  const box = $('#mixer'); box.innerHTML = ''; mixLeds = [];
+  const chans = [
+    { name:'MASTER', cls:'bus', max:1, unity:0.8, get:() => state.volume,
+      set:v => { state.volume = v; if (master) master.gain.setTargetAtTime(v, ac.currentTime, 0.03); $('#volRange').value = v; },
+      led:() => Math.max(melLevel(), ...padFlash) },
+    { name:'TRUMMOR', cls:'bus', max:1.5, unity:1, get:() => state.drumVol,
+      set:v => { state.drumVol = v; if (drumOut) drumOut.gain.setTargetAtTime(v, ac.currentTime, 0.03); },
+      led:() => Math.max(...padFlash) },
+    { name:'MELODI', cls:'melc', max:1.5, unity:1, cfg:state.syn, get:() => state.syn.vol,
+      set:v => { state.syn.vol = v; if (voiceBus) voiceBus.gain.setTargetAtTime(0.9 * v, ac.currentTime, 0.03); },
+      led:melLevel, used:melody.slice(0, L()).some(Boolean) }
+  ].concat(DRUMS.map((d, i) => ({ name:d.name, cls:'drum', max:1.5, unity:1, cfg:state.trk[i], idx:i, get:() => state.trk[i].vol,
+      set:v => { state.trk[i].vol = v; }, led:() => padFlash[i], used:drumHits(i) > 0 })));
+  chans.forEach(ch => {
+    const el = document.createElement('div');
+    el.className = `ch ${ch.cls}` + (ch.used ? ' used' : '') + (ch.cfg && ch.cfg.mute ? ' muted' : '');
+    el.innerHTML = `<span class="led"></span><output>${Math.round(ch.get() * 100)}</output>`;
+    const out = el.querySelector('output');
+    el.append(fader(ch, v => { ch.set(v); out.textContent = Math.round(v * 100); }, () => { save(); if (ch.idx !== undefined) audition(ch.idx); }));
+    if (ch.cfg){
+      const m = document.createElement('button'); m.className = 'chip mute'; m.textContent = 'M';
+      m.setAttribute('aria-pressed', String(ch.cfg.mute)); m.setAttribute('aria-label', 'Tysta ' + ch.name);
+      m.addEventListener('click', () => {
+        ch.cfg.mute = !ch.cfg.mute; m.setAttribute('aria-pressed', String(ch.cfg.mute)); el.classList.toggle('muted', ch.cfg.mute);
+        if (ch.cls === 'melc' && ch.cfg.mute && seqVoice){ seqVoice.v.release(); seqVoice = null; }
+        save();
+      });
+      el.append(m);
+    }
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = ch.name; el.append(nm);
+    box.append(el);
+    mixLeds.push({ el:el.querySelector('.led'), level:ch.led });
+  });
+  requestFrame();
+}
+function melLevel(){
+  let v = 0;
+  touches.forEach(t => { if (t.kind === 'strip') v = Math.max(v, 0.4 + 0.6 * t.press); });
+  stripGlow.forEach(sg => { if (sg) v = Math.max(v, sg.f); });
+  return v;
+}
+function updateMixLeds(){
+  if ($('#tracks').hidden || trkTab !== 'mixer') return false;
+  mixLeds.forEach(m => { m.el.style.opacity = Math.min(1, m.level()).toFixed(2); });
+  return true;
+}
+$('#tracksBtn').addEventListener('click', () => { renderTrkTabs(); showTrk(); $('#tracks').hidden = false; });
 $('#closeTracks').addEventListener('click', () => { $('#tracks').hidden = true; });
 $('#tracks').addEventListener('click', e => { if (e.target.id === 'tracks') $('#tracks').hidden = true; });
 
