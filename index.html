@@ -306,6 +306,14 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
   <main class="deck"><canvas id="surface" aria-label="Spelyta: strängar och trumpads"></canvas></main>
 </div>
 
+<div class="overlay" id="resume" hidden>
+  <div class="card">
+    <h1>glimt</h1>
+    <p class="lede" id="resumeText">Ljudet pausades när skärmen släcktes. Tryck för att fortsätta spela.</p>
+    <button class="btn go" id="resumeBtn">Fortsätt spela</button>
+  </div>
+</div>
+
 <div class="overlay" id="start">
   <div class="card">
     <h1>glimt</h1>
@@ -515,6 +523,11 @@ function ensureAudio(){
     noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
     const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random()*2-1;
     applyKit();
+    const ctx = ac;
+    ctx.addEventListener('statechange', () => {
+      if (ctx !== ac) return;                    // an old engine closing after a rebuild
+      if (ctx.state !== 'running' && ctx.state !== 'closed' && !document.hidden && $('#start').hidden && $('#resume').hidden){ goneAway(); cameBack(); }
+    });
   }
   if (ac.state !== 'running') ac.resume().catch(() => {});
 }
@@ -1034,7 +1047,59 @@ canvas.addEventListener('lostpointercapture', end);
 canvas.addEventListener('touchstart', e => e.preventDefault(), { passive:false });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('visibilitychange', () => { if (document.hidden){ releaseAll(); if (seq.playing) stopSeq(); } });
+/* ---------------- sleep and wake ----------------
+   iOS suspends (or breaks) web audio when the screen locks or the app goes to the background, and only a
+   tap may start it again. So: stop cleanly when hidden, and when we come back ask for one tap, rebuild the
+   audio engine inside that tap and carry on where we were. Everything else lives in localStorage. */
+let wasPlaying = false, wasRec = false, wentAway = false, wakeLock = null;
+async function requestWake(){
+  try {
+    if (navigator.wakeLock && !wakeLock && document.visibilityState === 'visible'){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) {}
+}
+function goneAway(){
+  if (!ac || wentAway) return;
+  wentAway = true;
+  wasPlaying = seq.playing; wasRec = seq.rec;
+  releaseAll();
+  if (seq.playing) stopSeq();
+}
+function cameBack(){
+  if (!ac || !wentAway) return;
+  if (!$('#start').hidden) return;              // first start screen still up, nothing to resume
+  $('#resumeText').textContent = wasPlaying
+    ? 'Ljudet pausades när skärmen släcktes. Tryck för att fortsätta, slingan startar om från början.'
+    : 'Ljudet pausades när skärmen släcktes. Tryck för att fortsätta spela.';
+  $('#resume').hidden = false;
+}
+function unlockSilent(){
+  try { const b = ac.createBuffer(1, 1, ac.sampleRate), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); } catch (e) {}
+}
+function rebuildAudio(){
+  // a context that went through a screen lock can claim to be running and still be silent on iOS: start fresh
+  seqVoice = null; touches.clear();
+  try { if (ac) ac.close(); } catch (e) {}
+  ac = null;
+  ensureAudio(); unlockSilent();
+}
+function resumeNow(){
+  rebuildAudio();                                // runs inside the tap, so the new context may start
+  wentAway = false;
+  $('#resume').hidden = true;
+  requestWake();
+  if (wasPlaying){ startSeq(); if (wasRec){ seq.rec = true; renderTransport(); } }
+  wasPlaying = wasRec = false;
+  requestFrame();
+}
+document.addEventListener('visibilitychange', () => { document.hidden ? goneAway() : cameBack(); });
+window.addEventListener('pagehide', goneAway);
+window.addEventListener('pageshow', e => { if (e.persisted){ wentAway = wentAway || !!ac; cameBack(); } });
+window.addEventListener('focus', () => { if (ac && ac.state !== 'running' && !document.hidden){ wentAway = true; cameBack(); } });
+$('#resumeBtn').addEventListener('click', e => { e.stopPropagation(); resumeNow(); });
+$('#resume').addEventListener('click', resumeNow);
 
 /* ---------------- rendering ---------------- */
 function requestFrame(){ if (!raf) raf = requestAnimationFrame(frame); }
@@ -1594,10 +1659,10 @@ $('#metroBtn').addEventListener('click', () => { ensureAudio(); state.metro = !s
 $('#settingsBtn').addEventListener('click', () => { renderSheet(); $('#sheet').hidden = false; });
 $('#closeSheet').addEventListener('click', () => { $('#sheet').hidden = true; });
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#sheet').hidden = true; });
-$('#startBtn').addEventListener('click', async () => {
-  ensureAudio();
+$('#startBtn').addEventListener('click', () => {
+  ensureAudio(); unlockSilent();
   $('#start').hidden = true;
-  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
+  requestWake();
 });
 
 new ResizeObserver(() => layout()).observe(canvas);
