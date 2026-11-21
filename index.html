@@ -3,20 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-180.png">
 <title>Glimt spelyta</title>
+<meta name="description" content="Tryckkänslig LED-spelyta för mobil och iPad med strängar, trummor och sekvenserare.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Glimt">
 <meta name="theme-color" content="#06080b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one full-screen instrument panel. A slim control rail on top, an LED playing surface filling the rest.
-   Deliberately single-theme: an unlit dark panel so the LEDs read, whatever the host theme. */
+/* Layout: one full-screen instrument panel. Control rail and sequencer bar on top, LED playing surface filling the rest.
+   Deliberately single-theme: an unlit dark panel so the LEDs read. */
 :root{
   --ground:#06080b;
   --panel:#0c1015;
@@ -27,11 +29,13 @@
   --dim:#81919c;
   --led:#bfefff;
   --amber:#ffb35c;
+  --rec:#ff5a5f;
   --font-ui:"Sora", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   color-scheme: dark;
 }
-html{height:100%;box-sizing:border-box;background:var(--ground);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{height:100%;box-sizing:border-box;background:var(--ground);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
 [hidden]{display:none!important}
 body{
@@ -60,11 +64,31 @@ body{
   font:600 14px/1 var(--font-ui);height:38px;min-width:38px;padding:0 12px;border-radius:10px;cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;
 }
+.btn.icon{padding:0;width:42px}
 .btn:active{background:var(--raise)}
 .btn:focus-visible,.seg button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--led);outline-offset:2px}
-.oct{font-family:var(--font-mono);font-size:12px;color:var(--ink);min-width:52px;text-align:center}
+.oct{font-family:var(--font-mono);font-size:12px;color:var(--ink);min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
 .oct small{color:var(--dim);font-size:10px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:2px}
-@media (max-width:560px){ .brand span,.status{display:none} .rail{justify-content:space-between} }
+/* ---------- sequencer bar ---------- */
+.seqbar{display:flex;align-items:center;gap:8px;min-height:40px}
+#playBtn[aria-pressed="true"]{background:var(--led);border-color:var(--led);color:#05222c}
+.recdot{width:12px;height:12px;border-radius:50%;background:var(--rec);opacity:.55}
+#recBtn[aria-pressed="true"]{border-color:var(--rec)}
+#recBtn[aria-pressed="true"] .recdot{opacity:1;box-shadow:0 0 10px var(--rec);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+.steps{flex:1;min-width:0;display:grid;grid-template-columns:repeat(16,1fr);gap:3px;align-items:center;height:22px}
+.step{height:14px;border-radius:4px;background:rgba(191,239,255,.07);transition:background .06s}
+.step:nth-child(4n+1){background:rgba(191,239,255,.13)}
+.step.has{background:rgba(255,179,92,.45)}
+.step.now{background:var(--led);box-shadow:0 0 8px rgba(191,239,255,.8)}
+.step.has.now{background:#fff3e3;box-shadow:0 0 10px rgba(255,179,92,.9)}
+@media (max-width:560px){
+  .brand span,.status{display:none}
+  .rail{justify-content:space-between}
+  .seqbar{flex-wrap:wrap;row-gap:6px}
+  .steps{order:9;flex-basis:100%}
+  .seqbar .spacer{flex:1}
+}
 /* ---------- deck ---------- */
 .deck{
   flex:1;min-height:0;position:relative;border-radius:20px;
@@ -98,13 +122,16 @@ body{
 .sheet .card{max-width:560px;max-height:100%;overflow:auto;gap:18px}
 .sheet-head{display:flex;justify-content:space-between;align-items:center}
 .sheet-head h2{margin:0;font-size:18px}
+.sheet h3{margin:4px 0 0;font-size:13px;color:var(--led);font-weight:600;letter-spacing:.02em;border-top:1px solid var(--line);padding-top:16px}
 .field{display:flex;flex-direction:column;gap:8px}
 .label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.label output{color:var(--ink);float:right;letter-spacing:0}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{
   appearance:none;flex:1 0 auto;min-width:44px;height:38px;padding:0 12px;border-radius:10px;cursor:pointer;
   border:1px solid var(--line);background:var(--rail);color:var(--ink);font:600 13px/1 var(--font-ui);touch-action:manipulation;
 }
+.seg button:active{background:var(--raise)}
 .seg.keys button{flex:1 0 calc(16.66% - 6px);font-family:var(--font-mono);padding:0}
 .seg button[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#2a1700}
 select{appearance:none;-webkit-appearance:none;height:40px;border-radius:10px;border:1px solid var(--line);
@@ -113,8 +140,9 @@ select{appearance:none;-webkit-appearance:none;height:40px;border-radius:10px;bo
 .switch{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
 .switch input{width:46px;height:28px;accent-color:var(--amber)}
 input[type=range]{width:100%;accent-color:var(--led);height:28px}
+.hint{margin:0;font-size:12px;line-height:1.5;color:var(--dim)}
 @media (max-width:420px){ .row2{grid-template-columns:1fr} }
-@media (prefers-reduced-motion: reduce){ .overlay{-webkit-backdrop-filter:none;backdrop-filter:none} }
+@media (prefers-reduced-motion: reduce){ .overlay{-webkit-backdrop-filter:none;backdrop-filter:none} #recBtn .recdot{animation:none!important} }
 </style>
 </head>
 <body>
@@ -129,10 +157,26 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <button class="btn" id="octUp" aria-label="Oktav upp">+</button>
     </div>
     <button class="btn" id="settingsBtn" aria-label="Inställningar">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
       <span>Ljud</span>
     </button>
   </header>
+
+  <div class="seqbar" id="seqbar">
+    <button class="btn icon" id="playBtn" aria-label="Spela komp" aria-pressed="false">
+      <svg id="playIcon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+    </button>
+    <button class="btn icon" id="recBtn" aria-label="Spela in trummor" aria-pressed="false"><span class="recdot"></span></button>
+    <div class="steps" id="steps" aria-hidden="true"></div>
+    <span class="spacer"></span>
+    <div class="group">
+      <button class="btn" id="bpmDown" aria-label="Långsammare">−</button>
+      <div class="oct"><small>BPM</small><span id="bpmLabel">100</span></div>
+      <button class="btn" id="bpmUp" aria-label="Snabbare">+</button>
+    </div>
+    <button class="btn" id="clearBtn">Rensa</button>
+  </div>
+
   <main class="deck"><canvas id="surface" aria-label="Spelyta: strängar och trumpads"></canvas></main>
 </div>
 
@@ -144,8 +188,8 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <li><b>Tryck</b><span>Sätt ett finger på en sträng för att spela en ton.</span></li>
       <li><b>Glid</b><span>Dra åt sidan för att böja tonen, eller vicka för vibrato.</span></li>
       <li><b>Längs</b><span>Längre ut på strängen blir klangen ljusare.</span></li>
-      <li><b>Tryck hårt</b><span>Större fingeryta ger starkare ton. Apple Pencil ger riktigt tryck.</span></li>
-      <li><b>Övre raden</b><span>Trummor: bas, virvel, klapp, hihat, tom och klocka.</span></li>
+      <li><b>Trummor</b><span>Övre raden, eller hela ytan som 4×4 under Ljud → Yta.</span></li>
+      <li><b>Komp</b><span>▶ spelar ett trumkomp. Tryck ● och slå på padsen för att spela in.</span></li>
     </ul>
     <button class="btn go" id="startBtn">Starta</button>
     <p class="tip">Hör du inget på iPhone? Slå av ljudlöst läge. Lägg till sidan på hemskärmen (Dela → Lägg till på hemskärmen) för helskärm.</p>
@@ -154,17 +198,25 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
 
 <div class="overlay sheet" id="sheet" hidden>
   <div class="card" role="dialog" aria-label="Inställningar">
-    <div class="sheet-head"><h2>Ljud och skala</h2><button class="btn" id="closeSheet">Klar</button></div>
+    <div class="sheet-head"><h2>Inställningar</h2><button class="btn" id="closeSheet">Klar</button></div>
+    <div class="field"><span class="label">Yta</span><div class="seg" id="surfaceSeg"></div></div>
+
+    <h3>Strängar</h3>
     <div class="field"><span class="label">Ljud</span><div class="seg" id="soundSeg"></div></div>
     <div class="field"><span class="label">Tonart</span><div class="seg keys" id="keySeg"></div></div>
     <div class="row2">
       <div class="field"><label class="label" for="scaleSel">Skala</label><select id="scaleSel"></select></div>
-      <div class="field"><span class="label">Strängar</span><div class="seg" id="stripSeg"></div></div>
+      <div class="field"><span class="label">Antal strängar</span><div class="seg" id="stripSeg"></div></div>
     </div>
-    <div class="row2">
-      <label class="switch" for="glideChk">Glid mellan toner <input type="checkbox" id="glideChk"></label>
-      <label class="switch" for="drumChk">Trumrad <input type="checkbox" id="drumChk"></label>
-    </div>
+    <label class="switch" for="glideChk">Glid mellan toner <input type="checkbox" id="glideChk"></label>
+
+    <h3>Trummor och komp</h3>
+    <div class="field"><span class="label">Trumset</span><div class="seg" id="kitSeg"></div></div>
+    <div class="field"><span class="label">Ladda ett komp</span><div class="seg" id="beatSeg"></div>
+      <p class="hint">Ersätter det inspelade mönstret. Du kan sedan spela in fler slag ovanpå.</p></div>
+    <div class="field"><label class="label" for="bpmRange">Tempo <output id="bpmOut"></output></label><input type="range" id="bpmRange" min="60" max="180" step="1"></div>
+
+    <h3>Mix</h3>
     <div class="row2">
       <div class="field"><label class="label" for="revRange">Rumsklang</label><input type="range" id="revRange" min="0" max="1" step="0.01"></div>
       <div class="field"><label class="label" for="volRange">Volym</label><input type="range" id="volRange" min="0" max="1" step="0.01"></div>
@@ -195,14 +247,33 @@ const PRESETS = {
   lead:  { name:'Lead',   osc:['square','sawtooth'],   detune:[0,-1200], mix:[0.32,0.3], a:0.012, d:0.25,s:0.85, r:0.25,cut:420,  range:5.4, q:9 },
   pad:   { name:'Pad',    osc:['sawtooth','sawtooth'], detune:[-14,14],  mix:[0.3,0.3],  a:0.35,  d:1.0, s:0.85, r:2.4, cut:320,  range:4.4, q:1.5 }
 };
+const KITS = {
+  klassisk:{ name:'Klassisk', lp:20000, drive:0 },
+  tolv:    { name:'808',      lp:20000, drive:0 },
+  lofi:    { name:'Lo-fi',    lp:3000,  drive:0.7 }
+};
+const SURFACES = { delad:'Strängar + trummor', strangar:'Bara strängar', trummor:'Trummor 4×4' };
 
 /* ---------------- settings ---------------- */
-const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8, drums:true };
+const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8,
+  surface:'delad', kit:'klassisk', bpm:100, pattern:null };
 let state = { ...DEFAULTS };
-try { const s = JSON.parse(localStorage.getItem('glimt-settings') || 'null'); if (s) state = { ...state, ...s }; } catch (e) {}
+let stored = null;
+try { stored = JSON.parse(localStorage.getItem('glimt-settings') || 'null'); if (stored) state = { ...state, ...stored }; } catch (e) {}
+if (stored && stored.drums === false && !stored.surface) state.surface = 'strangar';
+delete state.drums;
 if (!SCALES[state.scale]) state.scale = DEFAULTS.scale;
 if (!PRESETS[state.sound]) state.sound = DEFAULTS.sound;
-function save(){ try { localStorage.setItem('glimt-settings', JSON.stringify(state)); } catch (e) {} }
+if (!KITS[state.kit]) state.kit = DEFAULTS.kit;
+if (!SURFACES[state.surface]) state.surface = DEFAULTS.surface;
+state.bpm = clamp(+state.bpm || 100, 60, 180);
+
+function save(){
+  try {
+    const out = { ...state, pattern: pattern.map(st => st.map(n => [n[0], n[1]])) };
+    localStorage.setItem('glimt-settings', JSON.stringify(out));
+  } catch (e) {}
+}
 
 function noteOf(i){
   const sc = SCALES[state.scale], n = sc.length;
@@ -214,11 +285,22 @@ const freq = m => 440 * Math.pow(2, (m - 69) / 12);
 const nameOf = m => NOTE_NAMES[((Math.round(m) % 12) + 12) % 12] + (Math.floor(Math.round(m) / 12) - 1);
 
 /* ---------------- audio ---------------- */
-let ac = null, master, voiceBus, drumBus, revSend, noiseBuf;
+let ac = null, master, voiceBus, drumBus, kitFilt, kitShaper, revSend, noiseBuf;
 function makeIR(sec){
   const len = Math.floor(ac.sampleRate * sec), buf = ac.createBuffer(2, len, ac.sampleRate);
   for (let c = 0; c < 2; c++){ const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3.2); }
   return buf;
+}
+function driveCurve(k){
+  const n = 1024, c = new Float32Array(n), a = 1 + k * 8;
+  for (let i = 0; i < n; i++){ const x = i * 2 / n - 1; c[i] = Math.tanh(a * x) / Math.tanh(a); }
+  return c;
+}
+function applyKit(){
+  if (!ac) return;
+  const k = KITS[state.kit];
+  kitFilt.frequency.setTargetAtTime(k.lp, ac.currentTime, 0.02);
+  kitShaper.curve = k.drive ? driveCurve(k.drive) : null;
 }
 function ensureAudio(){
   if (!ac){
@@ -230,14 +312,19 @@ function ensureAudio(){
     master = ac.createGain(); master.gain.value = state.volume;
     master.connect(comp); comp.connect(ac.destination);
     voiceBus = ac.createGain(); voiceBus.gain.value = 0.9; voiceBus.connect(master);
-    drumBus = ac.createGain(); drumBus.gain.value = 0.95; drumBus.connect(master);
+    drumBus = ac.createGain(); drumBus.gain.value = 0.95;
+    kitFilt = ac.createBiquadFilter(); kitFilt.type = 'lowpass'; kitFilt.Q.value = 0.5;
+    kitShaper = ac.createWaveShaper();
+    const drumOut = ac.createGain(); drumOut.gain.value = 1;
+    drumBus.connect(kitShaper); kitShaper.connect(kitFilt); kitFilt.connect(drumOut); drumOut.connect(master);
     const conv = ac.createConvolver(); conv.buffer = makeIR(2.6);
     revSend = ac.createGain(); revSend.gain.value = state.reverb;
-    const drumSend = ac.createGain(); drumSend.gain.value = 0.25;
-    voiceBus.connect(revSend); drumBus.connect(drumSend); drumSend.connect(revSend);
+    const drumSend = ac.createGain(); drumSend.gain.value = 0.22;
+    voiceBus.connect(revSend); drumOut.connect(drumSend); drumSend.connect(revSend);
     revSend.connect(conv); conv.connect(master);
-    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
     const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random()*2-1;
+    applyKit();
   }
   if (ac.state !== 'running') ac.resume().catch(() => {});
 }
@@ -277,46 +364,122 @@ function makeVoice(f, along, press){
   };
 }
 
-/* drums, all synthesized */
+/* ---------------- drums, all synthesized ---------------- */
 function env(g, t, peak, dec){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.001), t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
 function noise(){ const s = ac.createBufferSource(); s.buffer = noiseBuf; return s; }
-function hat(t, v, dec){
-  const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain();
-  f.type = 'highpass'; f.frequency.value = 7000; env(g, t, 0.4 * v, dec);
-  n.connect(f); f.connect(g); g.connect(drumBus); n.start(t); n.stop(t + dec + 0.05);
+function filtered(type, f, q){ const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; }
+function noiseHit(t, v, type, f, q, dec, gain){
+  const n = noise(), b = filtered(type, f, q), g = ac.createGain();
+  env(g, t, gain * v, dec); n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + dec + 0.05);
 }
-function tom(t, v, f0, f1){
-  const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine';
-  o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.25);
-  env(g, t, 0.8 * v, 0.45); o.connect(g); g.connect(drumBus); o.start(t); o.stop(t + 0.5);
+function tone(t, v, type, f0, f1, glide, dec, gain){
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + glide);
+  env(g, t, gain * v, dec); o.connect(g); g.connect(drumBus); o.start(t); o.stop(t + dec + 0.05);
 }
+function metal(t, v, dec, gain, center){
+  const hp = filtered('highpass', 7000), bp = filtered('bandpass', center, 0.8), g = ac.createGain();
+  env(g, t, gain * v, dec); bp.connect(hp); hp.connect(g); g.connect(drumBus);
+  [205.3, 304.4, 369.6, 522.7, 540, 800].forEach(f => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(bp); o.start(t); o.stop(t + dec + 0.05); });
+}
+const is808 = () => state.kit === 'tolv';
 const DRUMS = [
-  { name:'BAS', play(t, v){ const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine';
-      o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
-      env(g, t, 1.0 * v, 0.5); o.connect(g); g.connect(drumBus); o.start(t); o.stop(t + 0.55); } },
-  { name:'VIRVEL', play(t, v){ const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain();
-      f.type = 'highpass'; f.frequency.value = 1200; env(g, t, 0.55 * v, 0.22);
-      n.connect(f); f.connect(g); g.connect(drumBus); n.start(t); n.stop(t + 0.25);
-      const o = ac.createOscillator(), g2 = ac.createGain(); o.type = 'triangle';
-      o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(160, t + 0.08);
-      env(g2, t, 0.5 * v, 0.12); o.connect(g2); g2.connect(drumBus); o.start(t); o.stop(t + 0.15); } },
-  { name:'KLAPP', play(t, v){ const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1600; f.Q.value = 1.2; f.connect(drumBus);
+  /* 0 */ { name:'BAS', play(t, v){
+      if (is808()){ tone(t, v, 'sine', 120, 47, 0.07, 1.1, 1.0); tone(t, v, 'square', 900, 900, 0, 0.008, 0.15); }
+      else tone(t, v, 'sine', 160, 42, 0.16, 0.5, 1.0); } },
+  /* 1 */ { name:'VIRVEL', play(t, v){
+      if (is808()){ noiseHit(t, v, 'highpass', 2200, 0, 0.18, 0.45); tone(t, v, 'triangle', 185, 185, 0, 0.1, 0.4); tone(t, v, 'triangle', 330, 330, 0, 0.07, 0.3); }
+      else { noiseHit(t, v, 'highpass', 1200, 0, 0.22, 0.55); tone(t, v, 'triangle', 220, 160, 0.08, 0.12, 0.5); } } },
+  /* 2 */ { name:'KLAPP', play(t, v){ const f = filtered('bandpass', 1600, 1.2); f.connect(drumBus);
       [0, 0.011, 0.023].forEach((d, k) => { const n = noise(), g = ac.createGain();
         env(g, t + d, (k === 2 ? 0.75 : 0.45) * v, k === 2 ? 0.25 : 0.03); n.connect(g); g.connect(f); n.start(t + d); n.stop(t + d + 0.3); }); } },
-  { name:'HIHAT', play(t, v){ hat(t, v, 0.06); } },
-  { name:'ÖPPEN', play(t, v){ hat(t, v, 0.38); } },
-  { name:'TOM L', play(t, v){ tom(t, v, 130, 85); } },
-  { name:'TOM H', play(t, v){ tom(t, v, 210, 150); } },
-  { name:'KLOCKA', play(t, v){ const f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 2;
+  /* 3 */ { name:'HIHAT', play(t, v){ is808() ? metal(t, v, 0.05, 0.35, 10000) : noiseHit(t, v, 'highpass', 7000, 0, 0.06, 0.4); } },
+  /* 4 */ { name:'ÖPPEN', play(t, v){ is808() ? metal(t, v, 0.4, 0.3, 10000) : noiseHit(t, v, 'highpass', 7000, 0, 0.38, 0.4); } },
+  /* 5 */ { name:'TOM L', play(t, v){ tone(t, v, 'sine', 130, 85, 0.25, is808() ? 0.8 : 0.45, 0.8); } },
+  /* 6 */ { name:'TOM H', play(t, v){ tone(t, v, 'sine', 210, 150, 0.25, is808() ? 0.6 : 0.4, 0.75); } },
+  /* 7 */ { name:'KLOCKA', play(t, v){ const f = filtered('bandpass', 900, 2), g = ac.createGain();
       env(g, t, 0.35 * v, 0.35); f.connect(g); g.connect(drumBus);
-      [562, 845].forEach(fr => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = fr; o.connect(f); o.start(t); o.stop(t + 0.4); }); } }
+      [562, 845].forEach(fr => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = fr; o.connect(f); o.start(t); o.stop(t + 0.4); }); } },
+  /* 8 */ { name:'RIM', play(t, v){ tone(t, v, 'triangle', 1700, 1700, 0, 0.03, 0.5); noiseHit(t, v, 'bandpass', 3200, 2, 0.02, 0.4); } },
+  /* 9 */ { name:'SHAKER', play(t, v){ const n = noise(), b = filtered('bandpass', 6500, 1), g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.32 * v, t + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + 0.15); } },
+  /* 10 */{ name:'TOM M', play(t, v){ tone(t, v, 'sine', 165, 115, 0.25, is808() ? 0.7 : 0.42, 0.78); } },
+  /* 11 */{ name:'CONGA', play(t, v){ tone(t, v, 'sine', is808() ? 390 : 340, is808() ? 360 : 300, 0.05, 0.25, 0.6); } },
+  /* 12 */{ name:'CRASH', play(t, v){ noiseHit(t, v, 'highpass', 4500, 0, 1.6, 0.32); if (is808()) metal(t, v, 1.2, 0.12, 8000); } },
+  /* 13 */{ name:'RIDE', play(t, v){ metal(t, v, 1.1, 0.14, 8500); noiseHit(t, v, 'highpass', 9000, 0, 0.4, 0.08); } },
+  /* 14 */{ name:'SUB', play(t, v){ tone(t, v, 'sine', 70, 49, 0.3, 1.6, 0.9); } },
+  /* 15 */{ name:'SNAP', play(t, v){ noiseHit(t, v, 'bandpass', 2500, 3, 0.06, 0.8); noiseHit(t, v, 'highpass', 5000, 0, 0.03, 0.25); } }
 ];
+const SPLIT_ORDER = [0, 1, 2, 3, 4, 5, 6, 7];
+const GRID_ORDER = [[0, 1, 2, 3], [4, 8, 9, 15], [5, 10, 6, 11], [12, 13, 14, 7]]; // rows from the bottom up
+
+/* ---------------- sequencer ---------------- */
+const emptyPattern = () => Array.from({ length:16 }, () => []);
+let pattern = emptyPattern();
+if (Array.isArray(state.pattern) && state.pattern.length === 16)
+  pattern = state.pattern.map(st => Array.isArray(st) ? st.filter(n => Array.isArray(n) && DRUMS[n[0]]).map(n => [n[0], clamp(+n[1] || 0.8, 0.1, 1)]) : []);
+delete state.pattern;
+
+const BEATS = {
+  tom:    { name:'Tomt',    bpm:null, p:{} },
+  rak:    { name:'Rak',     bpm:100, p:{ 0:[[0,1],[8,0.9],[10,0.6]], 1:[[4,0.9],[12,0.9]], 3:[[0,.5],[2,.4],[4,.5],[6,.4],[8,.5],[10,.4],[12,.5],[14,.4]] } },
+  hiphop: { name:'Hiphop',  bpm:88,  p:{ 0:[[0,1],[7,0.8],[10,0.9]], 1:[[4,0.9],[12,0.95]], 3:[[0,.5],[2,.35],[4,.5],[6,.35],[8,.5],[10,.35],[12,.5]], 4:[[14,.45]], 8:[[15,.3]] } },
+  house:  { name:'House',   bpm:124, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.8],[12,.8]], 4:[[2,.45],[6,.45],[10,.45],[14,.45]], 9:[[1,.3],[3,.3],[5,.3],[7,.3],[9,.3],[11,.3],[13,.3],[15,.3]] } },
+  trap:   { name:'Trap',    bpm:140, p:{ 14:[[0,1],[11,0.9]], 0:[[0,0.8],[11,0.7]], 15:[[8,0.9]], 2:[[8,0.6]], 3:[[0,.4],[2,.4],[4,.4],[6,.4],[7,.3],[8,.4],[10,.4],[12,.4],[13,.3],[14,.4],[15,.3]] } }
+};
+
+const seq = { playing:false, rec:false, nextTime:0, absStep:0, timer:0, current:-1 };
+let visQueue = [];
+const stepDur = () => 60 / state.bpm / 4;
+
+function scheduleSeq(){
+  if (!seq.playing) return;
+  while (seq.nextTime < ac.currentTime + 0.12){
+    const s = seq.absStep % 16;
+    for (const n of pattern[s]){
+      if (n[2]){ n[2] = 0; continue; }
+      DRUMS[n[0]].play(seq.nextTime, n[1]);
+      visQueue.push({ time:seq.nextTime, idx:n[0], v:n[1] });
+    }
+    visQueue.push({ time:seq.nextTime, step:s });
+    seq.absStep++;
+    seq.nextTime += stepDur();
+  }
+}
+function startSeq(){
+  ensureAudio();
+  if (seq.playing) return;
+  seq.playing = true; seq.absStep = 0; seq.nextTime = ac.currentTime + 0.06;
+  scheduleSeq(); seq.timer = setInterval(scheduleSeq, 25);
+  renderTransport(); requestFrame();
+}
+function stopSeq(){
+  seq.playing = false; seq.rec = false; clearInterval(seq.timer);
+  visQueue = []; seq.current = -1;
+  renderTransport(); renderSteps();
+}
+function recordHit(idx, v, t){
+  if (!seq.playing || !seq.rec) return;
+  const pos = seq.absStep - (seq.nextTime - t) / stepDur();
+  const k = Math.round(pos), s = ((k % 16) + 16) % 16;
+  const ex = pattern[s].find(n => n[0] === idx);
+  if (ex) ex[1] = Math.max(ex[1], v);
+  else pattern[s].push([idx, v, k >= seq.absStep ? 1 : 0]);
+  save(); renderSteps();
+}
+function loadBeat(key){
+  const b = BEATS[key]; pattern = emptyPattern();
+  Object.entries(b.p).forEach(([idx, steps]) => steps.forEach(([s, v]) => pattern[s].push([+idx, v])));
+  if (b.bpm) state.bpm = b.bpm;
+  save(); renderSteps(); renderTransport(); renderSheet();
+}
 
 /* ---------------- surface geometry ---------------- */
 const canvas = $('#surface'), g = canvas.getContext('2d');
 const base = document.createElement('canvas'), bg = base.getContext('2d');
 let W = 0, H = 0, dpr = 1, S = 8, portrait = false, N = 12, pitchUnit = 1;
-let area = { x:0, y:0, w:0, h:0 }, strips = [], dots = [], pads = [], padDots = [];
+let area = { x:0, y:0, w:0, h:0 }, strips = [], dots = [], pads = [];
 const padFlash = new Array(DRUMS.length).fill(0);
 const LABEL = 18;
 
@@ -324,6 +487,15 @@ function rr(c, x, y, w, h, r){
   r = Math.min(r, w / 2, h / 2);
   c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
   c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function makePad(idx, x, y, w, h){
+  const ds = [], cols = Math.max(1, Math.floor((w - S) / S)), rows = Math.max(1, Math.floor((h - S) / S));
+  const ox = x + (w - (cols - 1) * S) / 2, oy = y + (h - (rows - 1) * S) / 2;
+  const cx = x + w / 2, cy = y + h / 2, md = Math.hypot(w, h) / 2;
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++){
+    const dx = ox + c * S, dy = oy + r * S; ds.push({ x:dx, y:dy, c:1 - 0.55 * Math.hypot(dx - cx, dy - cy) / md });
+  }
+  return { idx, x, y, w, h, dots:ds };
 }
 
 function layout(){
@@ -335,56 +507,57 @@ function layout(){
   portrait = H > W * 1.05;
   S = clamp(Math.min(W, H) / 50, 6, 11);
   const gap = clamp(S * 0.9, 5, 10);
-  let top = 0;
-  pads = []; padDots = [];
-  if (state.drums){
-    const bandH = clamp(portrait ? H * 0.1 : H * 0.17, 48, 100), n = DRUMS.length, pw = (W - gap * (n - 1)) / n;
-    for (let k = 0; k < n; k++){
-      const p = { x:k * (pw + gap), y:0, w:pw, h:bandH }; pads.push(p);
-      const ds = [], cols = Math.max(1, Math.floor((p.w - S) / S)), rows = Math.max(1, Math.floor((p.h - S) / S));
-      const ox = p.x + (p.w - (cols - 1) * S) / 2, oy = p.y + (p.h - (rows - 1) * S) / 2;
-      for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) ds.push({ x:ox + c * S, y:oy + r * S });
-      padDots.push(ds);
-    }
-    top = bandH + gap * 1.8;
-  }
-  area = { x:0, y:top, w:W, h:H - top };
-  N = state.strips; strips = []; dots = [];
-  if (!portrait){
-    const sw = (area.w - gap * (N - 1)) / N; pitchUnit = sw + gap;
-    for (let i = 0; i < N; i++) strips.push({ x:area.x + i * (sw + gap), y:area.y, w:sw, h:area.h });
+  pads = []; strips = []; dots = [];
+  area = { x:0, y:H + 10, w:0, h:0 };
+
+  if (state.surface === 'trummor'){
+    const pg = gap * 1.4, pw = (W - pg * 3) / 4, ph = (H - pg * 3) / 4;
+    GRID_ORDER.forEach((row, r) => row.forEach((idx, c) => pads.push(makePad(idx, c * (pw + pg), H - ph - r * (ph + pg), pw, ph))));
   } else {
-    const sh = (area.h - gap * (N - 1)) / N; pitchUnit = sh + gap;
-    for (let i = 0; i < N; i++) strips.push({ x:area.x, y:area.y + area.h - sh - i * (sh + gap), w:area.w, h:sh });
-  }
-  strips.forEach(s => {
-    const T = portrait ? s.h : s.w, L = (portrait ? s.w : s.h) - LABEL;
-    const cols = T > S * 6 ? 3 : T > S * 3 ? 2 : 1, step = S * 0.95;
-    const count = Math.max(1, Math.floor((L - S * 0.4) / S)), off = (L - (count - 1) * S) / 2;
-    const ds = [];
-    for (let r = 0; r < count; r++){
-      const a = (off + r * S) / L;
-      for (let c = 0; c < cols; c++){
-        const cross = T / 2 + (c - (cols - 1) / 2) * step;
-        if (portrait) ds.push({ x:s.x + LABEL + off + r * S, y:s.y + cross, a });
-        else ds.push({ x:s.x + cross, y:s.y + s.h - LABEL - off - r * S, a });
-      }
+    let top = 0;
+    if (state.surface === 'delad'){
+      const bandH = clamp(portrait ? H * 0.1 : H * 0.17, 48, 100), n = SPLIT_ORDER.length, pw = (W - gap * (n - 1)) / n;
+      SPLIT_ORDER.forEach((idx, k) => pads.push(makePad(idx, k * (pw + gap), 0, pw, bandH)));
+      top = bandH + gap * 1.8;
     }
-    dots.push(ds);
-  });
+    area = { x:0, y:top, w:W, h:H - top };
+    N = state.strips;
+    if (!portrait){
+      const sw = (area.w - gap * (N - 1)) / N; pitchUnit = sw + gap;
+      for (let i = 0; i < N; i++) strips.push({ x:area.x + i * (sw + gap), y:area.y, w:sw, h:area.h });
+    } else {
+      const sh = (area.h - gap * (N - 1)) / N; pitchUnit = sh + gap;
+      for (let i = 0; i < N; i++) strips.push({ x:area.x, y:area.y + area.h - sh - i * (sh + gap), w:area.w, h:sh });
+    }
+    strips.forEach(s => {
+      const T = portrait ? s.h : s.w, L = (portrait ? s.w : s.h) - LABEL;
+      const cols = T > S * 6 ? 3 : T > S * 3 ? 2 : 1, step = S * 0.95;
+      const count = Math.max(1, Math.floor((L - S * 0.4) / S)), off = (L - (count - 1) * S) / 2;
+      const ds = [];
+      for (let r = 0; r < count; r++){
+        const a = (off + r * S) / L;
+        for (let c = 0; c < cols; c++){
+          const cross = T / 2 + (c - (cols - 1) / 2) * step;
+          if (portrait) ds.push({ x:s.x + LABEL + off + r * S, y:s.y + cross, a });
+          else ds.push({ x:s.x + cross, y:s.y + s.h - LABEL - off - r * S, a });
+        }
+      }
+      dots.push(ds);
+    });
+  }
   drawBase(); requestFrame();
 }
 
 function drawBase(){
   bg.setTransform(dpr, 0, 0, dpr, 0, 0); bg.clearRect(0, 0, W, H);
-  const dr = S * 0.27;
-  pads.forEach((p, k) => {
-    rr(bg, p.x, p.y, p.w, p.h, 8); bg.fillStyle = 'rgba(191,239,255,0.045)'; bg.fill();
-    bg.fillStyle = 'rgba(191,239,255,0.09)';
-    padDots[k].forEach(d => { bg.beginPath(); bg.arc(d.x, d.y, dr * 0.85, 0, 6.2832); bg.fill(); });
-    bg.font = `600 ${clamp(p.w / 7, 8, 11)}px "JetBrains Mono", ui-monospace, monospace`;
-    bg.fillStyle = 'rgba(226,236,241,0.6)'; bg.textAlign = 'left'; bg.textBaseline = 'top';
-    bg.fillText(DRUMS[k].name, p.x + 7, p.y + 6);
+  const dr = S * 0.27, big = state.surface === 'trummor';
+  pads.forEach(p => {
+    rr(bg, p.x, p.y, p.w, p.h, big ? 14 : 8); bg.fillStyle = 'rgba(191,239,255,0.045)'; bg.fill();
+    p.dots.forEach(d => { bg.fillStyle = `rgba(191,239,255,${big ? 0.05 + 0.08 * d.c : 0.09})`; bg.beginPath(); bg.arc(d.x, d.y, dr * 0.85, 0, 6.2832); bg.fill(); });
+    const fs = big ? clamp(p.w / 10, 10, 14) : clamp(p.w / 7, 8, 11);
+    bg.font = `600 ${fs}px "JetBrains Mono", ui-monospace, monospace`;
+    bg.fillStyle = 'rgba(226,236,241,0.65)'; bg.textAlign = 'left'; bg.textBaseline = 'top';
+    bg.fillText(DRUMS[p.idx].name, p.x + (big ? 12 : 7), p.y + (big ? 10 : 6));
   });
   strips.forEach((s, i) => {
     const m = noteOf(i), root = ((m - state.key) % 12 + 12) % 12 === 0;
@@ -405,7 +578,7 @@ function drawBase(){
 }
 
 function crossOf(x, y){
-  return portrait ? (area.y + area.h - y - (pitchUnit - (pitchUnit - strips[0].h)) / 2) / pitchUnit
+  return portrait ? (area.y + area.h - y - strips[0].h / 2) / pitchUnit
                   : (x - area.x - strips[0].w / 2) / pitchUnit;
 }
 function alongOf(x, y){
@@ -419,6 +592,10 @@ function pressureOf(e){
   if (e.pointerType === 'touch' && w > 2) return clamp((w - 12) / 38, 0.3, 1);
   return 0.75;
 }
+function padAt(x, y){
+  const tol = 4;
+  return pads.find(p => x >= p.x - tol && x <= p.x + p.w + tol && y >= p.y - tol && y <= p.y + p.h + tol);
+}
 
 /* ---------------- interaction ---------------- */
 const touches = new Map();
@@ -426,16 +603,21 @@ let ripples = [], raf = 0;
 const statusEl = $('#status');
 let lastNote = '';
 
-function local(e){ const r = canvas.getBoundingClientRect(); return { x:e.clientX - r.left - 0, y:e.clientY - r.top - 0 }; }
+function local(e){ const r = canvas.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
 
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   ensureAudio();
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   const { x, y } = local(e), press = pressureOf(e);
-  if (y < area.y - 2){
-    const k = pads.findIndex(p => x >= p.x - 3 && x <= p.x + p.w + 3 && y >= p.y && y <= p.y + p.h);
-    if (k >= 0){ DRUMS[k].play(ac.currentTime + 0.005, 0.35 + 0.65 * press); padFlash[k] = 1; }
+  const pad = padAt(x, y);
+  if (pad || !strips.length || y < area.y - 2){
+    if (pad){
+      const v = 0.35 + 0.65 * press, t = ac.currentTime + 0.005;
+      DRUMS[pad.idx].play(t, v); padFlash[pad.idx] = 1;
+      recordHit(pad.idx, v, t);
+      if (state.surface === 'trummor') ripples.push({ x, y, t:performance.now(), p:0.5 + 0.5 * press, pad });
+    }
     touches.set(e.pointerId, { kind:'drum' });
     requestFrame(); return;
   }
@@ -467,15 +649,14 @@ function end(e){
   if (t.kind === 'strip') t.voice.release();
   touches.delete(e.pointerId); requestFrame();
 }
+function releaseAll(){ touches.forEach(t => { if (t.kind === 'strip') t.voice.release(); }); touches.clear(); }
 canvas.addEventListener('pointerup', end);
 canvas.addEventListener('pointercancel', end);
 canvas.addEventListener('lostpointercapture', end);
 canvas.addEventListener('touchstart', e => e.preventDefault(), { passive:false });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden){ touches.forEach(t => { if (t.kind === 'strip') t.voice.release(); }); touches.clear(); }
-});
+document.addEventListener('visibilitychange', () => { if (document.hidden){ releaseAll(); if (seq.playing) stopSeq(); } });
 
 /* ---------------- rendering ---------------- */
 function requestFrame(){ if (!raf) raf = requestAnimationFrame(frame); }
@@ -483,34 +664,50 @@ function dot(x, y, r, color){ g.fillStyle = color; g.beginPath(); g.arc(x, y, r,
 
 function frame(now){
   raf = 0;
+  if (ac && visQueue.length){
+    const ct = ac.currentTime;
+    while (visQueue.length && visQueue[0].time <= ct){
+      const ev = visQueue.shift();
+      if (ev.step !== undefined){ seq.current = ev.step; renderSteps(); }
+      else padFlash[ev.idx] = Math.max(padFlash[ev.idx], 0.4 + 0.6 * ev.v);
+    }
+  }
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
   g.drawImage(base, 0, 0, W, H);
   g.globalCompositeOperation = 'lighter';
   let anim = false;
-  const dr = S * 0.27;
+  const dr = S * 0.27, big = state.surface === 'trummor';
 
-  pads.forEach((p, k) => {
-    const f = padFlash[k]; if (f < 0.01) return;
-    rr(g, p.x, p.y, p.w, p.h, 8); g.fillStyle = `rgba(191,239,255,${0.16 * f})`; g.fill();
-    const c = `rgba(225,249,255,${0.85 * f})`;
-    padDots[k].forEach(d => dot(d.x, d.y, dr, c));
-    padFlash[k] = f * 0.86; anim = true;
+  pads.forEach(p => {
+    const f = padFlash[p.idx]; if (f < 0.01) return;
+    rr(g, p.x, p.y, p.w, p.h, big ? 14 : 8); g.fillStyle = `rgba(191,239,255,${0.14 * f})`; g.fill();
+    for (const d of p.dots) dot(d.x, d.y, dr, `rgba(225,249,255,${0.85 * f * (big ? d.c : 1)})`);
   });
+  for (let k = 0; k < padFlash.length; k++){ if (padFlash[k] > 0.01){ padFlash[k] *= 0.86; anim = true; } else padFlash[k] = 0; }
 
   ripples = ripples.filter(rp => {
     const age = (now - rp.t) / 1000; if (age > 0.7) return false;
-    const rad = age * Math.max(W, H) * 0.9, width = S * 1.5, fade = (1 - age / 0.7) * rp.p;
-    for (const ds of dots) for (const d of ds){
-      const dd = Math.abs(Math.hypot(d.x - rp.x, d.y - rp.y) - rad);
-      if (dd < width) dot(d.x, d.y, dr, `rgba(191,239,255,${(1 - dd / width) * fade * 0.7})`);
+    const width = S * 1.5, fade = (1 - age / 0.7) * rp.p;
+    if (rp.pad){
+      const rad = age * Math.max(rp.pad.w, rp.pad.h) * 1.6;
+      for (const d of rp.pad.dots){
+        const dd = Math.abs(Math.hypot(d.x - rp.x, d.y - rp.y) - rad);
+        if (dd < width) dot(d.x, d.y, dr, `rgba(255,236,210,${(1 - dd / width) * fade * 0.8})`);
+      }
+    } else {
+      const rad = age * Math.max(W, H) * 0.9;
+      for (const ds of dots) for (const d of ds){
+        const dd = Math.abs(Math.hypot(d.x - rp.x, d.y - rp.y) - rad);
+        if (dd < width) dot(d.x, d.y, dr, `rgba(191,239,255,${(1 - dd / width) * fade * 0.7})`);
+      }
     }
     return true;
   });
 
   touches.forEach(t => {
     if (t.kind !== 'strip') return;
-    const s = strips[t.cur];
+    const s = strips[t.cur]; if (!s) return;
     rr(g, s.x, s.y, s.w, s.h, 8); g.fillStyle = `rgba(191,239,255,${0.05 + 0.08 * t.press})`; g.fill();
     const R = S * (5 + 7 * t.press);
     const grd = g.createRadialGradient(t.x, t.y, 0, t.x, t.y, R * 1.6);
@@ -525,13 +722,29 @@ function frame(now){
     }
   });
   g.globalCompositeOperation = 'source-over';
-  if (touches.size || ripples.length || anim) requestFrame();
+  if (touches.size || ripples.length || anim || seq.playing) requestFrame();
 }
 
 /* ---------------- UI ---------------- */
+const stepsEl = $('#steps');
+for (let i = 0; i < 16; i++){ const s = document.createElement('span'); s.className = 'step'; stepsEl.appendChild(s); }
+function renderSteps(){
+  [...stepsEl.children].forEach((el, i) => {
+    el.classList.toggle('has', pattern[i].length > 0);
+    el.classList.toggle('now', seq.playing && i === seq.current);
+  });
+}
+function renderTransport(){
+  $('#playBtn').setAttribute('aria-pressed', String(seq.playing));
+  $('#playBtn').setAttribute('aria-label', seq.playing ? 'Stoppa komp' : 'Spela komp');
+  $('#playIcon').innerHTML = seq.playing ? '<rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor"/>' : '<path d="M4 2.5v11l9-5.5z" fill="currentColor"/>';
+  $('#recBtn').setAttribute('aria-pressed', String(seq.rec));
+  $('#bpmLabel').textContent = state.bpm;
+  $('#seqbar').hidden = state.surface === 'strangar';
+}
 function setNote(m){ lastNote = nameOf(m); renderStatus(); }
 function renderStatus(){
-  statusEl.innerHTML = `<strong>${NOTE_NAMES[state.key]} ${state.scale.toLowerCase()}</strong> · ${PRESETS[state.sound].name}` +
+  statusEl.innerHTML = `<strong>${NOTE_NAMES[state.key]} ${state.scale.toLowerCase()}</strong> · ${PRESETS[state.sound].name} · ${KITS[state.kit].name}` +
     (lastNote ? ` · <span class="note">${lastNote}</span>` : '');
   $('#octLabel').textContent = state.octave;
 }
@@ -539,30 +752,40 @@ function seg(el, items, current, onPick){
   el.innerHTML = '';
   items.forEach(([val, label]) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
-    b.setAttribute('aria-pressed', String(val === current));
-    b.addEventListener('click', () => { onPick(val); });
+    if (current !== undefined) b.setAttribute('aria-pressed', String(val === current));
+    b.addEventListener('click', () => onPick(val));
     el.appendChild(b);
   });
 }
 function renderSheet(){
+  seg($('#surfaceSeg'), Object.entries(SURFACES), state.surface, v => { state.surface = v; if (v === 'strangar' && seq.playing) stopSeq(); changed(true); });
   seg($('#soundSeg'), Object.entries(PRESETS).map(([k, p]) => [k, p.name]), state.sound, v => { state.sound = v; changed(false); });
   seg($('#keySeg'), NOTE_NAMES.map((n, i) => [i, n]), state.key, v => { state.key = v; changed(true); });
   seg($('#stripSeg'), [[8,'8'],[12,'12'],[16,'16']], state.strips, v => { state.strips = v; changed(true); });
+  seg($('#kitSeg'), Object.entries(KITS).map(([k, p]) => [k, p.name]), state.kit, v => { state.kit = v; applyKit(); changed(false); });
+  seg($('#beatSeg'), Object.entries(BEATS).map(([k, b]) => [k, b.name]), undefined, v => loadBeat(v));
   const sel = $('#scaleSel');
   if (!sel.options.length) Object.keys(SCALES).forEach(k => { const o = document.createElement('option'); o.value = o.textContent = k; sel.appendChild(o); });
   sel.value = state.scale;
-  $('#glideChk').checked = state.glide; $('#drumChk').checked = state.drums;
+  $('#glideChk').checked = state.glide;
+  $('#bpmRange').value = state.bpm; $('#bpmOut').textContent = state.bpm + ' BPM';
   $('#revRange').value = state.reverb; $('#volRange').value = state.volume;
 }
-function changed(relayout){ save(); renderSheet(); renderStatus(); if (relayout) layout(); }
+function changed(relayout){ save(); renderSheet(); renderStatus(); renderTransport(); if (relayout) layout(); }
+function setBpm(v){ state.bpm = clamp(Math.round(v), 60, 180); $('#bpmLabel').textContent = state.bpm; $('#bpmOut').textContent = state.bpm + ' BPM'; save(); }
 
 $('#scaleSel').addEventListener('change', e => { state.scale = e.target.value; changed(true); });
 $('#glideChk').addEventListener('change', e => { state.glide = e.target.checked; changed(false); });
-$('#drumChk').addEventListener('change', e => { state.drums = e.target.checked; changed(true); });
+$('#bpmRange').addEventListener('input', e => setBpm(+e.target.value));
 $('#revRange').addEventListener('input', e => { state.reverb = +e.target.value; if (revSend) revSend.gain.setTargetAtTime(state.reverb, ac.currentTime, 0.05); save(); });
 $('#volRange').addEventListener('input', e => { state.volume = +e.target.value; if (master) master.gain.setTargetAtTime(state.volume, ac.currentTime, 0.05); save(); });
 $('#octDown').addEventListener('click', () => { state.octave = clamp(state.octave - 1, 1, 6); changed(true); });
 $('#octUp').addEventListener('click', () => { state.octave = clamp(state.octave + 1, 1, 6); changed(true); });
+$('#bpmDown').addEventListener('click', () => { setBpm(state.bpm - 2); $('#bpmRange').value = state.bpm; });
+$('#bpmUp').addEventListener('click', () => { setBpm(state.bpm + 2); $('#bpmRange').value = state.bpm; });
+$('#playBtn').addEventListener('click', () => { seq.playing ? stopSeq() : startSeq(); });
+$('#recBtn').addEventListener('click', () => { seq.rec = !seq.rec; if (seq.rec && !seq.playing) startSeq(); renderTransport(); });
+$('#clearBtn').addEventListener('click', () => { pattern = emptyPattern(); save(); renderSteps(); });
 $('#settingsBtn').addEventListener('click', () => { renderSheet(); $('#sheet').hidden = false; });
 $('#closeSheet').addEventListener('click', () => { $('#sheet').hidden = true; });
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#sheet').hidden = true; });
@@ -575,9 +798,8 @@ $('#startBtn').addEventListener('click', async () => {
 new ResizeObserver(() => layout()).observe(canvas);
 window.addEventListener('orientationchange', () => setTimeout(layout, 250));
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawBase());
-renderStatus(); renderSheet(); layout();
+renderStatus(); renderSheet(); renderTransport(); renderSteps(); layout();
 })();
 </script>
-
 </body>
 </html>
