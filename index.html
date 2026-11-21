@@ -103,7 +103,7 @@ body{
 .groove input[type=range]{grid-column:1 / -1;width:84px;height:22px;accent-color:var(--amber)}
 @media (max-width:900px){ .groove{display:none} }
 @media (max-width:560px){
-  .brand span,.status{display:none}
+  .brand span,.status,.rail .btn span{display:none}
   .rail{justify-content:space-between}
   .seqbar{flex-wrap:wrap;row-gap:6px}
   .seqbar .break{display:block;order:8;flex-basis:100%;height:0}
@@ -164,6 +164,27 @@ select{appearance:none;-webkit-appearance:none;height:40px;border-radius:10px;bo
 input[type=range]{width:100%;accent-color:var(--led);height:28px}
 .hint{margin:0;font-size:12px;line-height:1.5;color:var(--dim)}
 @media (max-width:420px){ .row2{grid-template-columns:1fr} }
+/* ---------- tracks ---------- */
+.trk-list{display:flex;flex-direction:column;gap:6px}
+.trk{border:1px solid var(--line);border-radius:12px;background:var(--rail)}
+.trk.used{border-color:#2b3a47}
+.trk-head{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 4px}
+.trk-name{appearance:none;flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;background:none;border:0;color:var(--ink);
+  font:600 13px/1 var(--font-mono);letter-spacing:.06em;padding:10px 8px;text-align:left;cursor:pointer;border-radius:8px}
+.trk-name::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--line);flex:none;align-self:center}
+.trk.used .trk-name::before{background:var(--amber)}
+.trk.mel.used .trk-name::before{background:var(--led)}
+.trk-name small{font:400 11px var(--font-mono);color:var(--dim);letter-spacing:0}
+.trk-name[aria-expanded="true"]{color:var(--led)}
+.chip{appearance:none;height:32px;min-width:36px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+  color:var(--ink);font:600 12px/1 var(--font-ui);cursor:pointer;touch-action:manipulation}
+.chip:active{background:var(--raise)}
+.chip:disabled{opacity:.35;cursor:default}
+.chip.mute[aria-pressed="true"]{background:var(--rec);border-color:var(--rec);color:#2a0507}
+.trk.muted .trk-name{opacity:.45}
+.trk-body{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:6px 12px 14px}
+.trk-body .chip{justify-self:start}
+@media (max-width:420px){ .trk-body{grid-template-columns:1fr} }
 @media (prefers-reduced-motion: reduce){ .overlay{-webkit-backdrop-filter:none;backdrop-filter:none} #recBtn .recdot{animation:none!important} }
 </style>
 </head>
@@ -178,6 +199,10 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <div class="oct"><small>Oktav</small><span id="octLabel">3</span></div>
       <button class="btn" id="octUp" aria-label="Oktav upp">+</button>
     </div>
+    <button class="btn" id="tracksBtn" aria-label="Spår">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 4v16M12 4v16M18 4v16"/><rect x="4" y="13" width="4" height="3" rx="1" fill="currentColor"/><rect x="10" y="7" width="4" height="3" rx="1" fill="currentColor"/><rect x="16" y="15" width="4" height="3" rx="1" fill="currentColor"/></svg>
+      <span>Spår</span>
+    </button>
     <button class="btn" id="settingsBtn" aria-label="Inställningar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
       <span>Ljud</span>
@@ -226,6 +251,14 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
     </ul>
     <button class="btn go" id="startBtn">Starta</button>
     <p class="tip">Hör du inget på iPhone? Slå av ljudlöst läge. Lägg till sidan på hemskärmen (Dela → Lägg till på hemskärmen) för helskärm.</p>
+  </div>
+</div>
+
+<div class="overlay sheet" id="tracks" hidden>
+  <div class="card" role="dialog" aria-label="Spår">
+    <div class="sheet-head"><h2>Spår</h2><button class="btn" id="closeTracks">Klar</button></div>
+    <p class="hint">Tryck på ett spår för att justera ljudet. M tystar spåret i slingan, Rensa tar bort det som är inspelat på spåret.</p>
+    <div class="trk-list" id="trackList"></div>
   </div>
 </div>
 
@@ -370,7 +403,7 @@ function ensureAudio(){
     comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
     master = ac.createGain(); master.gain.value = state.volume;
     master.connect(comp); comp.connect(ac.destination);
-    voiceBus = ac.createGain(); voiceBus.gain.value = 0.9; voiceBus.connect(master);
+    voiceBus = ac.createGain(); voiceBus.gain.value = 0.9 * state.syn.vol; voiceBus.connect(master);
     drumBus = ac.createGain(); drumBus.gain.value = 0.95;
     kitFilt = ac.createBiquadFilter(); kitFilt.type = 'lowpass'; kitFilt.Q.value = 0.5;
     kitShaper = ac.createWaveShaper();
@@ -395,7 +428,8 @@ const pressGain = p => 0.07 + 0.23 * p;
 function cutoff(p, along, press){ return clamp(p.cut * Math.pow(2, along * p.range) * (0.65 + 0.7 * press), 60, 18000); }
 
 function makeVoice(f, along, press, when){
-  const p = PRESETS[state.sound], t = Math.max(when ?? 0, ac.currentTime);
+  const b = PRESETS[state.sound], y = state.syn, t = Math.max(when ?? 0, ac.currentTime);
+  const p = { ...b, cut:b.cut * Math.pow(2, y.cut * 2), q:Math.max(0.3, b.q * y.res), d:b.d * y.len, r:b.r * y.len, fdec:b.fdec ? b.fdec * y.len : 0 };
   const filt = ac.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = p.q; filt.frequency.value = cutoff(p, along, press);
   const vca = ac.createGain(); vca.gain.value = 0;
   const amp = ac.createGain(); amp.gain.value = pressGain(press);
@@ -437,22 +471,24 @@ function makeVoice(f, along, press, when){
 }
 
 /* ---------------- drums, all synthesized ---------------- */
-function env(g, t, peak, dec){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.001), t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
+/* P = pitch factor and D = length factor of the drum track being played (set by playDrum) */
+let P = 1, D = 1;
+function env(g, t, peak, dec){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.001), t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dec * D); }
 function noise(){ const s = ac.createBufferSource(); s.buffer = noiseBuf; return s; }
-function filtered(type, f, q){ const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; }
+function filtered(type, f, q){ const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = Math.min(f * P, 18000); if (q) b.Q.value = q; return b; }
 function noiseHit(t, v, type, f, q, dec, gain){
   const n = noise(), b = filtered(type, f, q), g = ac.createGain();
-  env(g, t, gain * v, dec); n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + dec + 0.05);
+  env(g, t, gain * v, dec); n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + dec * D + 0.05);
 }
 function tone(t, v, type, f0, f1, glide, dec, gain){
   const o = ac.createOscillator(), g = ac.createGain(); o.type = type;
-  o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + glide);
-  env(g, t, gain * v, dec); o.connect(g); g.connect(drumBus); o.start(t); o.stop(t + dec + 0.05);
+  o.frequency.setValueAtTime(f0 * P, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1 * P, t + glide);
+  env(g, t, gain * v, dec); o.connect(g); g.connect(drumBus); o.start(t); o.stop(t + dec * D + 0.05);
 }
 function metal(t, v, dec, gain, center){
   const hp = filtered('highpass', 7000), bp = filtered('bandpass', center, 0.8), g = ac.createGain();
   env(g, t, gain * v, dec); bp.connect(hp); hp.connect(g); g.connect(drumBus);
-  [205.3, 304.4, 369.6, 522.7, 540, 800].forEach(f => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(bp); o.start(t); o.stop(t + dec + 0.05); });
+  [205.3, 304.4, 369.6, 522.7, 540, 800].forEach(f => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = f * P; o.connect(bp); o.start(t); o.stop(t + dec * D + 0.05); });
 }
 const is808 = () => state.kit === 'tolv';
 const DRUMS = [
@@ -464,18 +500,18 @@ const DRUMS = [
       else { noiseHit(t, v, 'highpass', 1200, 0, 0.22, 0.55); tone(t, v, 'triangle', 220, 160, 0.08, 0.12, 0.5); } } },
   /* 2 */ { name:'KLAPP', play(t, v){ const f = filtered('bandpass', 1600, 1.2); f.connect(drumBus);
       [0, 0.011, 0.023].forEach((d, k) => { const n = noise(), g = ac.createGain();
-        env(g, t + d, (k === 2 ? 0.75 : 0.45) * v, k === 2 ? 0.25 : 0.03); n.connect(g); g.connect(f); n.start(t + d); n.stop(t + d + 0.3); }); } },
+        env(g, t + d, (k === 2 ? 0.75 : 0.45) * v, k === 2 ? 0.25 : 0.03); n.connect(g); g.connect(f); n.start(t + d); n.stop(t + d + 0.3 * D); }); } },
   /* 3 */ { name:'HIHAT', play(t, v){ is808() ? metal(t, v, 0.05, 0.35, 10000) : noiseHit(t, v, 'highpass', 7000, 0, 0.06, 0.4); } },
   /* 4 */ { name:'ÖPPEN', play(t, v){ is808() ? metal(t, v, 0.4, 0.3, 10000) : noiseHit(t, v, 'highpass', 7000, 0, 0.38, 0.4); } },
   /* 5 */ { name:'TOM L', play(t, v){ tone(t, v, 'sine', 130, 85, 0.25, is808() ? 0.8 : 0.45, 0.8); } },
   /* 6 */ { name:'TOM H', play(t, v){ tone(t, v, 'sine', 210, 150, 0.25, is808() ? 0.6 : 0.4, 0.75); } },
   /* 7 */ { name:'KLOCKA', play(t, v){ const f = filtered('bandpass', 900, 2), g = ac.createGain();
       env(g, t, 0.35 * v, 0.35); f.connect(g); g.connect(drumBus);
-      [562, 845].forEach(fr => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = fr; o.connect(f); o.start(t); o.stop(t + 0.4); }); } },
+      [562, 845].forEach(fr => { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = fr * P; o.connect(f); o.start(t); o.stop(t + 0.4 * D); }); } },
   /* 8 */ { name:'RIM', play(t, v){ tone(t, v, 'triangle', 1700, 1700, 0, 0.03, 0.5); noiseHit(t, v, 'bandpass', 3200, 2, 0.02, 0.4); } },
   /* 9 */ { name:'SHAKER', play(t, v){ const n = noise(), b = filtered('bandpass', 6500, 1), g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.32 * v, t + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
-      n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + 0.15); } },
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.32 * v, t + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11 * D);
+      n.connect(b); b.connect(g); g.connect(drumBus); n.start(t); n.stop(t + 0.15 * D); } },
   /* 10 */{ name:'TOM M', play(t, v){ tone(t, v, 'sine', 165, 115, 0.25, is808() ? 0.7 : 0.42, 0.78); } },
   /* 11 */{ name:'CONGA', play(t, v){ tone(t, v, 'sine', is808() ? 390 : 340, is808() ? 360 : 300, 0.05, 0.25, 0.6); } },
   /* 12 */{ name:'CRASH', play(t, v){ noiseHit(t, v, 'highpass', 4500, 0, 1.6, 0.32); if (is808()) metal(t, v, 1.2, 0.12, 8000); } },
@@ -483,6 +519,13 @@ const DRUMS = [
   /* 14 */{ name:'SUB', play(t, v){ tone(t, v, 'sine', 70, 49, 0.3, 1.6, 0.9); } },
   /* 15 */{ name:'SNAP', play(t, v){ noiseHit(t, v, 'bandpass', 2500, 3, 0.06, 0.8); noiseHit(t, v, 'highpass', 5000, 0, 0.03, 0.25); } }
 ];
+function playDrum(idx, t, v, fromSeq){
+  const tr = state.trk[idx];
+  if (fromSeq && tr.mute) return false;
+  P = Math.pow(2, tr.tune / 12); D = tr.dec;
+  try { DRUMS[idx].play(t, clamp(v * tr.vol, 0.01, 1.6)); } finally { P = 1; D = 1; }
+  return true;
+}
 const SPLIT_ORDER = [0, 1, 2, 3, 4, 5, 6, 7];
 const GRID_ORDER = [[0, 1, 2, 3], [4, 8, 9, 15], [5, 10, 6, 11], [12, 13, 14, 7]]; // rows from the bottom up
 
@@ -524,6 +567,15 @@ function copyFirstHalf(){
 // an older 16-step loop opened in 32-step mode plays twice instead of leaving half the bar silent
 if (state.steps === 32 && secondHalfEmpty()) copyFirstHalf();
 state.human = clamp(+state.human || 0, 0, 1);
+const TRK_DEFAULT = () => ({ vol:1, tune:0, dec:1, mute:false });
+const SYN_DEFAULT = () => ({ vol:1, cut:0, res:1, len:1, mute:false });
+state.trk = Array.from({ length:16 }, (_, i) => {
+  const t = Array.isArray(state.trk) && state.trk[i] || {};
+  return { vol:clamp(+t.vol || 1, 0, 1.5), tune:clamp(+t.tune || 0, -12, 12), dec:clamp(+t.dec || 1, 0.3, 2.5), mute:!!t.mute };
+});
+{ const y = state.syn || {};
+  state.syn = { vol:clamp(Number.isFinite(+y.vol) ? +y.vol : 1, 0, 1.5), cut:clamp(+y.cut || 0, -1, 1), res:clamp(Number.isFinite(+y.res) ? +y.res : 1, 0, 2),
+                len:clamp(+y.len || 1, 0.3, 3), mute:!!y.mute }; }
 const toneAl = al => clamp(al + state.tone * 0.6, 0, 1);
 const ACID_LINE = [
   [0, 0, 1, .30, .95], [2, 0, 1, .22, .5], [3, 5, 1, .38, .9, 1], [4, 0, 1, .22, .5],
@@ -556,7 +608,7 @@ function click(t, accent){
 }
 function scheduleMelody(s, T, dur){
   const mn = melody[s];
-  let play = !!mn;
+  let play = !!mn && !state.syn.mute;
   if (mn && mn.skip){ mn.skip = 0; play = false; }
   let Tn = T;
   if (play && mn.sl && seqVoice){
@@ -591,7 +643,7 @@ function scheduleSeq(){
     for (const n of pattern[s]){
       if (n[2]){ n[2] = 0; continue; }
       const ht = Math.max(ac.currentTime, T + jitter() * 0.012), hv = clamp(n[1] * (1 + jitter() * 0.25), 0.05, 1);
-      DRUMS[n[0]].play(ht, hv);
+      if (!playDrum(n[0], ht, hv, true)) continue;
       visQueue.push({ time:ht, idx:n[0], v:hv });
     }
     scheduleMelody(s, T, dur);
@@ -803,7 +855,7 @@ canvas.addEventListener('pointerdown', e => {
   if (pad || !strips.length || y < area.y - 2){
     if (pad){
       const v = 0.35 + 0.65 * press, t = ac.currentTime + 0.005;
-      DRUMS[pad.idx].play(t, v); padFlash[pad.idx] = 1;
+      playDrum(pad.idx, t, v); padFlash[pad.idx] = 1;
       recordHit(pad.idx, v, t);
       if (state.surface === 'trummor') ripples.push({ x, y, t:performance.now(), p:0.5 + 0.5 * press, pad });
     }
@@ -1015,6 +1067,81 @@ $('#bpmUp').addEventListener('click', () => { setBpm(state.bpm + 2); $('#bpmRang
 $('#playBtn').addEventListener('click', () => { seq.playing ? stopSeq() : startSeq(); });
 $('#recBtn').addEventListener('click', () => { seq.rec = !seq.rec; if (seq.rec && !seq.playing) startSeq(); renderTransport(); });
 $('#clearBtn').addEventListener('click', () => { pattern = emptyPattern(); melody = emptyMelody(); save(); renderSteps(); });
+/* ---------------- tracks panel ---------------- */
+let openTrack = null, lastAudition = 0, auditionTimer = 0;
+function drumHits(idx){ let c = 0; for (let s = 0; s < L(); s++) if (pattern[s].some(n => n[0] === idx)) c++; return c; }
+function audition(idx){
+  // at most one preview per 140 ms, but the latest setting is always heard
+  clearTimeout(auditionTimer);
+  const wait = 140 - (performance.now() - lastAudition);
+  if (wait > 0){ auditionTimer = setTimeout(() => audition(idx), wait); return; }
+  lastAudition = performance.now();
+  ensureAudio(); playDrum(idx, ac.currentTime + 0.005, 0.85); padFlash[idx] = 1; requestFrame();
+}
+function slider(label, min, max, step, value, fmt, onInput){
+  const id = 'tk-' + Math.random().toString(36).slice(2, 8);
+  const f = document.createElement('div'); f.className = 'field';
+  f.innerHTML = `<label class="label" for="${id}">${label} <output></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}">`;
+  const inp = f.querySelector('input'), out = f.querySelector('output');
+  inp.value = value; out.textContent = fmt(value);
+  inp.addEventListener('input', () => { const v = +inp.value; out.textContent = fmt(v); onInput(v); });
+  return f;
+}
+const pct = v => Math.round(v * 100) + ' %';
+function renderTracks(){
+  const list = $('#trackList'); list.innerHTML = '';
+  const rows = [{ key:'mel', name:'MELODI', count:melody.slice(0, L()).filter(Boolean).length, unit:'toner' }]
+    .concat(DRUMS.map((d, i) => ({ key:i, name:d.name, count:drumHits(i), unit:'steg' })));
+  rows.forEach(r => {
+    const isMel = r.key === 'mel', cfg = isMel ? state.syn : state.trk[r.key];
+    const row = document.createElement('div');
+    row.className = 'trk' + (isMel ? ' mel' : '') + (r.count ? ' used' : '') + (cfg.mute ? ' muted' : '');
+    const open = openTrack === r.key;
+    row.innerHTML = `<div class="trk-head">
+        <button class="trk-name" aria-expanded="${open}">${r.name}<small>${r.count ? r.count + ' ' + r.unit : 'tomt'}</small></button>
+        <button class="chip mute" aria-pressed="${cfg.mute}" aria-label="Tysta ${r.name}">M</button>
+        <button class="chip clr" ${r.count ? '' : 'disabled'}>Rensa</button></div>`;
+    row.querySelector('.trk-name').addEventListener('click', () => { openTrack = open ? null : r.key; renderTracks(); if (!open && !isMel) audition(r.key); });
+    row.querySelector('.mute').addEventListener('click', () => {
+      cfg.mute = !cfg.mute;
+      if (isMel && cfg.mute && seqVoice){ seqVoice.v.release(); seqVoice = null; }
+      save(); renderTracks();
+    });
+    row.querySelector('.clr').addEventListener('click', () => {
+      if (isMel){ for (let s = 0; s < L(); s++) melody[s] = null; }
+      else for (let s = 0; s < L(); s++) pattern[s] = pattern[s].filter(n => n[0] !== r.key);
+      save(); renderSteps(); renderTracks();
+    });
+    if (open){
+      const body = document.createElement('div'); body.className = 'trk-body';
+      if (isMel){
+        body.append(
+          slider('Volym', 0, 1.5, 0.01, cfg.vol, pct, v => { cfg.vol = v; if (voiceBus) voiceBus.gain.setTargetAtTime(0.9 * v, ac.currentTime, 0.03); save(); }),
+          slider('Filter', -1, 1, 0.01, cfg.cut, v => (v > 0 ? '+' : '') + Math.round(v * 100), v => { cfg.cut = v; save(); }),
+          slider('Resonans', 0, 2, 0.01, cfg.res, pct, v => { cfg.res = v; save(); }),
+          slider('Längd', 0.3, 3, 0.01, cfg.len, v => '×' + v.toFixed(1), v => { cfg.len = v; save(); }));
+      } else {
+        body.append(
+          slider('Volym', 0, 1.5, 0.01, cfg.vol, pct, v => { cfg.vol = v; save(); audition(r.key); }),
+          slider('Tonhöjd', -12, 12, 1, cfg.tune, v => (v > 0 ? '+' : '') + v + ' halvtoner', v => { cfg.tune = v; save(); audition(r.key); }),
+          slider('Längd', 0.3, 2.5, 0.01, cfg.dec, v => '×' + v.toFixed(1), v => { cfg.dec = v; save(); audition(r.key); }));
+      }
+      const reset = document.createElement('button'); reset.className = 'chip'; reset.textContent = 'Återställ ljudet';
+      reset.addEventListener('click', () => {
+        const d = isMel ? SYN_DEFAULT() : TRK_DEFAULT(); d.mute = cfg.mute; Object.assign(cfg, d);
+        if (isMel && voiceBus) voiceBus.gain.setTargetAtTime(0.9 * cfg.vol, ac.currentTime, 0.03);
+        save(); renderTracks(); if (!isMel) audition(r.key);
+      });
+      body.append(reset);
+      row.append(body);
+    }
+    list.append(row);
+  });
+}
+$('#tracksBtn').addEventListener('click', () => { renderTracks(); $('#tracks').hidden = false; });
+$('#closeTracks').addEventListener('click', () => { $('#tracks').hidden = true; });
+$('#tracks').addEventListener('click', e => { if (e.target.id === 'tracks') $('#tracks').hidden = true; });
+
 let toneDrag = false, lastToneSlot = -1, lastToneAt = 0;
 function setTone(v, fromAuto){
   state.tone = clamp(v, -1, 1);
