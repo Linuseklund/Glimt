@@ -82,11 +82,18 @@ body{
 .step.has{background:rgba(255,179,92,.45)}
 .step.now{background:var(--led);box-shadow:0 0 8px rgba(191,239,255,.8)}
 .step.has.now{background:#fff3e3;box-shadow:0 0 10px rgba(255,179,92,.9)}
+.step.mel{box-shadow:inset 0 -5px 0 rgba(191,239,255,.85)}
+.step.mel.now{box-shadow:0 0 10px rgba(191,239,255,.9), inset 0 -5px 0 #ffffff}
+.seqbar .break{display:none}
+.tone{display:flex;align-items:center;gap:6px;flex:none;font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.tone input{width:96px;height:28px;accent-color:var(--led)}
 @media (max-width:560px){
   .brand span,.status{display:none}
   .rail{justify-content:space-between}
   .seqbar{flex-wrap:wrap;row-gap:6px}
-  .steps{order:9;flex-basis:100%}
+  .seqbar .break{display:block;order:8;flex-basis:100%;height:0}
+  .steps{order:9}
+  .tone{order:10}
   .seqbar .spacer{flex:1}
 }
 /* ---------- deck ---------- */
@@ -167,7 +174,9 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <svg id="playIcon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
     </button>
     <button class="btn icon" id="recBtn" aria-label="Spela in trummor" aria-pressed="false"><span class="recdot"></span></button>
+    <span class="break"></span>
     <div class="steps" id="steps" aria-hidden="true"></div>
+    <label class="tone" for="toneRange">Klang <input type="range" id="toneRange" min="-1" max="1" step="0.01" aria-label="Klang för den inspelade slingan"></label>
     <span class="spacer"></span>
     <div class="group">
       <button class="btn" id="bpmDown" aria-label="Långsammare">−</button>
@@ -189,7 +198,7 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <li><b>Glid</b><span>Dra åt sidan för att böja tonen, eller vicka för vibrato.</span></li>
       <li><b>Längs</b><span>Längre ut på strängen blir klangen ljusare.</span></li>
       <li><b>Trummor</b><span>Övre raden, eller hela ytan som 4×4 under Ljud → Yta.</span></li>
-      <li><b>Komp</b><span>▶ spelar ett trumkomp. Tryck ● och slå på padsen för att spela in.</span></li>
+      <li><b>Komp</b><span>▶ spelar slingan. Tryck ● och spela trummor eller strängar för att spela in. Håll kvar en ton medan du trycker nästa för slide.</span></li>
     </ul>
     <button class="btn go" id="startBtn">Starta</button>
     <p class="tip">Hör du inget på iPhone? Slå av ljudlöst läge. Lägg till sidan på hemskärmen (Dela → Lägg till på hemskärmen) för helskärm.</p>
@@ -213,7 +222,8 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
     <h3>Trummor och komp</h3>
     <div class="field"><span class="label">Trumset</span><div class="seg" id="kitSeg"></div></div>
     <div class="field"><span class="label">Ladda ett komp</span><div class="seg" id="beatSeg"></div>
-      <p class="hint">Ersätter det inspelade mönstret. Du kan sedan spela in fler slag ovanpå.</p></div>
+      <p class="hint">Ersätter trummönstret. Acid laddar även en basslinga. Du kan sedan spela in mer ovanpå.</p></div>
+    <div class="field"><span class="label">Rensa</span><div class="seg" id="clearSeg"></div></div>
     <div class="field"><label class="label" for="bpmRange">Tempo <output id="bpmOut"></output></label><input type="range" id="bpmRange" min="60" max="180" step="1"></div>
 
     <h3>Mix</h3>
@@ -267,7 +277,7 @@ const SURFACES = { delad:'Strängar + trummor', strangar:'Bara strängar', trumm
 
 /* ---------------- settings ---------------- */
 const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8,
-  surface:'delad', kit:'klassisk', bpm:100, pattern:null };
+  surface:'delad', kit:'klassisk', bpm:100, tone:0, pattern:null, melody:null };
 let state = { ...DEFAULTS };
 let stored = null;
 try { stored = JSON.parse(localStorage.getItem('glimt-settings') || 'null'); if (stored) state = { ...state, ...stored }; } catch (e) {}
@@ -281,7 +291,8 @@ state.bpm = clamp(+state.bpm || 100, 60, 180);
 
 function save(){
   try {
-    const out = { ...state, pattern: pattern.map(st => st.map(n => [n[0], n[1]])) };
+    const out = { ...state, pattern: pattern.map(st => st.map(n => [n[0], n[1]])),
+      melody: melody.map(n => n && { i:n.i, len:n.len, al:n.al, pr:n.pr, sl:n.sl }) };
     localStorage.setItem('glimt-settings', JSON.stringify(out));
   } catch (e) {}
 }
@@ -346,8 +357,8 @@ function hold(param, t){
 const pressGain = p => 0.07 + 0.23 * p;
 function cutoff(p, along, press){ return clamp(p.cut * Math.pow(2, along * p.range) * (0.65 + 0.7 * press), 60, 18000); }
 
-function makeVoice(f, along, press){
-  const p = PRESETS[state.sound], t = ac.currentTime;
+function makeVoice(f, along, press, when){
+  const p = PRESETS[state.sound], t = Math.max(when ?? 0, ac.currentTime);
   const filt = ac.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = p.q; filt.frequency.value = cutoff(p, along, press);
   const vca = ac.createGain(); vca.gain.value = 0;
   const amp = ac.createGain(); amp.gain.value = pressGain(press);
@@ -372,18 +383,18 @@ function makeVoice(f, along, press){
   vca.gain.linearRampToValueAtTime(1, t + p.a);
   vca.gain.setTargetAtTime(p.s, t + p.a, p.d / 3);
   return {
-    setFreq(f){ const n = ac.currentTime; oscs.forEach(o => o.frequency.setTargetAtTime(f, n, 0.006)); },
+    setFreq(f, at, tc){ const n = Math.max(at ?? 0, ac.currentTime); oscs.forEach(o => o.frequency.setTargetAtTime(f, n, tc ?? 0.006)); },
     setTone(along, press){
       const n = ac.currentTime;
       filt.frequency.setTargetAtTime(cutoff(p, along, press), n, 0.02);
       amp.gain.setTargetAtTime(pressGain(press), n, 0.03);
       if (p.fenv) filt.Q.setTargetAtTime(p.q * (0.75 + 0.45 * press), n, 0.05);
     },
-    release(){
-      const n = ac.currentTime;
+    release(at){
+      const n = Math.max(at ?? 0, ac.currentTime);
       hold(vca.gain, n); vca.gain.setTargetAtTime(0, n, p.r / 4);
       oscs.forEach(o => { try { o.stop(n + p.r * 1.6 + 0.1); } catch (e) {} });
-      setTimeout(() => { try { amp.disconnect(); } catch (e) {} }, (p.r * 1.6 + 0.3) * 1000);
+      setTimeout(() => { try { amp.disconnect(); } catch (e) {} }, (n - ac.currentTime + p.r * 1.6 + 0.3) * 1000);
     }
   };
 }
@@ -445,32 +456,77 @@ if (Array.isArray(state.pattern) && state.pattern.length === 16)
   pattern = state.pattern.map(st => Array.isArray(st) ? st.filter(n => Array.isArray(n) && DRUMS[n[0]]).map(n => [n[0], clamp(+n[1] || 0.8, 0.1, 1)]) : []);
 delete state.pattern;
 
+/* melody: one monophonic note per step, stored as a strip index so key, scale and octave transpose it.
+   len = steps held, al = position along the strip (cutoff), pr = pressure (accent), sl = slide from the previous note */
+const emptyMelody = () => new Array(16).fill(null);
+let melody = emptyMelody();
+if (Array.isArray(state.melody) && state.melody.length === 16)
+  melody = state.melody.map(n => n && Number.isFinite(+n.i)
+    ? { i:+n.i | 0, len:clamp(+n.len | 0 || 1, 1, 16), al:clamp(+n.al || 0.4, 0, 1), pr:clamp(+n.pr || 0.7, 0.1, 1), sl:!!n.sl } : null);
+delete state.melody;
+const toneAl = al => clamp(al + state.tone * 0.6, 0, 1);
+const ACID_LINE = [
+  [0, 0, 1, .30, .95], [2, 0, 1, .22, .5], [3, 5, 1, .38, .9, 1], [4, 0, 1, .22, .5],
+  [6, 1, 1, .30, .6], [7, 2, 1, .34, .6, 1], [8, 0, 1, .40, .95], [10, 3, 1, .26, .5],
+  [11, 4, 1, .32, .6, 1], [12, 5, 1, .45, .95], [14, 0, 1, .24, .5], [15, 6, 1, .36, .7, 1]
+]; // [step, strip, len, along, pressure, slide]
+
 const BEATS = {
   tom:    { name:'Tomt',    bpm:null, p:{} },
   rak:    { name:'Rak',     bpm:100, p:{ 0:[[0,1],[8,0.9],[10,0.6]], 1:[[4,0.9],[12,0.9]], 3:[[0,.5],[2,.4],[4,.5],[6,.4],[8,.5],[10,.4],[12,.5],[14,.4]] } },
   hiphop: { name:'Hiphop',  bpm:88,  p:{ 0:[[0,1],[7,0.8],[10,0.9]], 1:[[4,0.9],[12,0.95]], 3:[[0,.5],[2,.35],[4,.5],[6,.35],[8,.5],[10,.35],[12,.5]], 4:[[14,.45]], 8:[[15,.3]] } },
   house:  { name:'House',   bpm:124, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.8],[12,.8]], 4:[[2,.45],[6,.45],[10,.45],[14,.45]], 9:[[1,.3],[3,.3],[5,.3],[7,.3],[9,.3],[11,.3],[13,.3],[15,.3]] } },
-  acid:   { name:'Acid',    bpm:128, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.7],[12,.7]], 4:[[2,.5],[6,.5],[10,.5],[14,.5]], 3:[[0,.3],[1,.25],[3,.3],[5,.25],[7,.3],[9,.25],[11,.3],[13,.25],[15,.3]], 8:[[3,.35],[11,.35]] } },
+  acid:   { name:'Acid',    bpm:128, mel:ACID_LINE, sound:'acid', octave:2, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.7],[12,.7]], 4:[[2,.5],[6,.5],[10,.5],[14,.5]], 3:[[0,.3],[1,.25],[3,.3],[5,.25],[7,.3],[9,.25],[11,.3],[13,.25],[15,.3]], 8:[[3,.35],[11,.35]] } },
   trap:   { name:'Trap',    bpm:140, p:{ 14:[[0,1],[11,0.9]], 0:[[0,0.8],[11,0.7]], 15:[[8,0.9]], 2:[[8,0.6]], 3:[[0,.4],[2,.4],[4,.4],[6,.4],[7,.3],[8,.4],[10,.4],[12,.4],[13,.3],[14,.4],[15,.3]] } }
 };
 
 const seq = { playing:false, rec:false, nextTime:0, absStep:0, timer:0, current:-1 };
-let visQueue = [];
+let visQueue = [], seqVoice = null;
 const stepDur = () => 60 / state.bpm / 4;
 
+function scheduleMelody(s, T, dur){
+  const mn = melody[s];
+  let play = !!mn;
+  if (mn && mn.skip){ mn.skip = 0; play = false; }
+  if (play && mn.sl && seqVoice){
+    // slide: keep the same voice, glide its pitch, no new filter hit
+    seqVoice.v.setFreq(freq(noteOf(mn.i)), T, 0.035);
+    seqVoice.end = T + mn.len * dur - 0.012; seqVoice.al = mn.al; seqVoice.pr = mn.pr;
+    seqVoice.v.setTone(toneAl(mn.al), mn.pr);
+  } else {
+    if (seqVoice && (play || seqVoice.end <= T + 1e-4)){ seqVoice.v.release(Math.min(seqVoice.end, T)); seqVoice = null; }
+    if (play) seqVoice = { v:makeVoice(freq(noteOf(mn.i)), toneAl(mn.al), mn.pr, T), end:T + mn.len * dur - 0.012, al:mn.al, pr:mn.pr };
+  }
+  if (play) visQueue.push({ time:T, strip:mn.i, al:mn.al, v:mn.pr });
+}
 function scheduleSeq(){
   if (!seq.playing) return;
   while (seq.nextTime < ac.currentTime + 0.12){
-    const s = seq.absStep % 16;
+    const s = seq.absStep % 16, T = seq.nextTime, dur = stepDur();
     for (const n of pattern[s]){
       if (n[2]){ n[2] = 0; continue; }
-      DRUMS[n[0]].play(seq.nextTime, n[1]);
-      visQueue.push({ time:seq.nextTime, idx:n[0], v:n[1] });
+      DRUMS[n[0]].play(T, n[1]);
+      visQueue.push({ time:T, idx:n[0], v:n[1] });
     }
-    visQueue.push({ time:seq.nextTime, step:s });
+    scheduleMelody(s, T, dur);
+    visQueue.push({ time:T, step:s });
     seq.absStep++;
-    seq.nextTime += stepDur();
+    seq.nextTime += dur;
   }
+}
+function seqPos(t){ return seq.absStep - (seq.nextTime - t) / stepDur(); }
+function recordNoteOn(t, i, along, press, legato){
+  if (!seq.playing || !seq.rec) return;
+  const pos = seqPos(ac.currentTime), k = Math.round(pos), s = ((k % 16) + 16) % 16;
+  melody[s] = { i, len:1, al:along, pr:press, sl:legato, skip:k >= seq.absStep ? 1 : 0 };
+  t.recStep = s; t.recPos = pos;
+  save(); renderSteps();
+}
+function recordNoteOff(t){
+  if (t.recStep === undefined || !seq.playing) return;
+  const n = melody[t.recStep]; if (!n) return;
+  n.len = clamp(Math.round(seqPos(ac.currentTime) - t.recPos), 1, 16);
+  save();
 }
 function startSeq(){
   ensureAudio();
@@ -481,6 +537,7 @@ function startSeq(){
 }
 function stopSeq(){
   seq.playing = false; seq.rec = false; clearInterval(seq.timer);
+  if (seqVoice){ seqVoice.v.release(); seqVoice = null; }
   visQueue = []; seq.current = -1;
   renderTransport(); renderSteps();
 }
@@ -497,7 +554,14 @@ function loadBeat(key){
   const b = BEATS[key]; pattern = emptyPattern();
   Object.entries(b.p).forEach(([idx, steps]) => steps.forEach(([s, v]) => pattern[s].push([+idx, v])));
   if (b.bpm) state.bpm = b.bpm;
-  save(); renderSteps(); renderTransport(); renderSheet();
+  if (key === 'tom') melody = emptyMelody();
+  if (b.mel){
+    melody = emptyMelody();
+    b.mel.forEach(([s, i, len, al, pr, sl]) => { melody[s] = { i, len, al, pr, sl:!!sl }; });
+  }
+  if (b.sound) state.sound = b.sound;
+  if (b.octave) state.octave = b.octave;
+  changed(true); renderSteps();
 }
 
 /* ---------------- surface geometry ---------------- */
@@ -506,6 +570,7 @@ const base = document.createElement('canvas'), bg = base.getContext('2d');
 let W = 0, H = 0, dpr = 1, S = 8, portrait = false, N = 12, pitchUnit = 1;
 let area = { x:0, y:0, w:0, h:0 }, strips = [], dots = [], pads = [];
 const padFlash = new Array(DRUMS.length).fill(0);
+const stripGlow = new Array(32).fill(null);
 const LABEL = 18;
 
 function rr(c, x, y, w, h, r){
@@ -649,6 +714,8 @@ canvas.addEventListener('pointerdown', e => {
   const cross = crossOf(x, y), i = clamp(Math.round(cross), 0, N - 1), along = alongOf(x, y);
   const m = noteOf(i);
   const t = { kind:'strip', i, cur:i, start:cross, x, y, press, along, m, voice:makeVoice(freq(m), along, press) };
+  const legato = [...touches.values()].some(o => o.kind === 'strip' && o.recStep !== undefined);
+  recordNoteOn(t, i, along, press, legato);
   touches.set(e.pointerId, t);
   ripples.push({ x, y, t:performance.now(), p:0.4 + 0.6 * press });
   setNote(m);
@@ -671,7 +738,7 @@ canvas.addEventListener('pointermove', e => {
 
 function end(e){
   const t = touches.get(e.pointerId); if (!t) return;
-  if (t.kind === 'strip') t.voice.release();
+  if (t.kind === 'strip'){ t.voice.release(); recordNoteOff(t); }
   touches.delete(e.pointerId); requestFrame();
 }
 function releaseAll(){ touches.forEach(t => { if (t.kind === 'strip') t.voice.release(); }); touches.clear(); }
@@ -694,6 +761,7 @@ function frame(now){
     while (visQueue.length && visQueue[0].time <= ct){
       const ev = visQueue.shift();
       if (ev.step !== undefined){ seq.current = ev.step; renderSteps(); }
+      else if (ev.strip !== undefined) stripGlow[ev.strip] = { f:0.55 + 0.45 * ev.v, al:toneAl(ev.al) };
       else padFlash[ev.idx] = Math.max(padFlash[ev.idx], 0.4 + 0.6 * ev.v);
     }
   }
@@ -710,6 +778,19 @@ function frame(now){
     for (const d of p.dots) dot(d.x, d.y, dr, `rgba(225,249,255,${0.85 * f * (big ? d.c : 1)})`);
   });
   for (let k = 0; k < padFlash.length; k++){ if (padFlash[k] > 0.01){ padFlash[k] *= 0.86; anim = true; } else padFlash[k] = 0; }
+
+  // notes played back by the sequencer light their strip around the recorded cutoff position
+  stripGlow.forEach((sg, i) => {
+    if (!sg) return;
+    if (sg.f < 0.02 || !strips[i]){ stripGlow[i] = null; return; }
+    const s = strips[i];
+    rr(g, s.x, s.y, s.w, s.h, 8); g.fillStyle = `rgba(191,239,255,${0.1 * sg.f})`; g.fill();
+    for (const d of dots[i]){
+      const k = 1 - Math.abs(d.a - sg.al) / 0.28; if (k <= 0) continue;
+      dot(d.x, d.y, dr * (1 + 0.3 * k), `rgba(235,252,255,${sg.f * k})`);
+    }
+    sg.f *= 0.9; anim = true;
+  });
 
   ripples = ripples.filter(rp => {
     const age = (now - rp.t) / 1000; if (age > 0.7) return false;
@@ -756,6 +837,7 @@ for (let i = 0; i < 16; i++){ const s = document.createElement('span'); s.classN
 function renderSteps(){
   [...stepsEl.children].forEach((el, i) => {
     el.classList.toggle('has', pattern[i].length > 0);
+    el.classList.toggle('mel', !!melody[i]);
     el.classList.toggle('now', seq.playing && i === seq.current);
   });
 }
@@ -765,7 +847,7 @@ function renderTransport(){
   $('#playIcon').innerHTML = seq.playing ? '<rect x="3.5" y="3.5" width="9" height="9" rx="1.5" fill="currentColor"/>' : '<path d="M4 2.5v11l9-5.5z" fill="currentColor"/>';
   $('#recBtn').setAttribute('aria-pressed', String(seq.rec));
   $('#bpmLabel').textContent = state.bpm;
-  $('#seqbar').hidden = state.surface === 'strangar';
+  $('#toneRange').value = state.tone;
 }
 function setNote(m){ lastNote = nameOf(m); renderStatus(); }
 function renderStatus(){
@@ -783,12 +865,17 @@ function seg(el, items, current, onPick){
   });
 }
 function renderSheet(){
-  seg($('#surfaceSeg'), Object.entries(SURFACES), state.surface, v => { state.surface = v; if (v === 'strangar' && seq.playing) stopSeq(); changed(true); });
+  seg($('#surfaceSeg'), Object.entries(SURFACES), state.surface, v => { state.surface = v; changed(true); });
   seg($('#soundSeg'), Object.entries(PRESETS).map(([k, p]) => [k, p.name]), state.sound, v => { state.sound = v; changed(false); });
   seg($('#keySeg'), NOTE_NAMES.map((n, i) => [i, n]), state.key, v => { state.key = v; changed(true); });
   seg($('#stripSeg'), [[8,'8'],[12,'12'],[16,'16']], state.strips, v => { state.strips = v; changed(true); });
   seg($('#kitSeg'), Object.entries(KITS).map(([k, p]) => [k, p.name]), state.kit, v => { state.kit = v; applyKit(); changed(false); });
   seg($('#beatSeg'), Object.entries(BEATS).map(([k, b]) => [k, b.name]), undefined, v => loadBeat(v));
+  seg($('#clearSeg'), [['drums', 'Trummor'], ['mel', 'Melodi'], ['all', 'Allt']], undefined, v => {
+    if (v !== 'mel') pattern = emptyPattern();
+    if (v !== 'drums') melody = emptyMelody();
+    save(); renderSteps();
+  });
   const sel = $('#scaleSel');
   if (!sel.options.length) Object.keys(SCALES).forEach(k => { const o = document.createElement('option'); o.value = o.textContent = k; sel.appendChild(o); });
   sel.value = state.scale;
@@ -810,7 +897,13 @@ $('#bpmDown').addEventListener('click', () => { setBpm(state.bpm - 2); $('#bpmRa
 $('#bpmUp').addEventListener('click', () => { setBpm(state.bpm + 2); $('#bpmRange').value = state.bpm; });
 $('#playBtn').addEventListener('click', () => { seq.playing ? stopSeq() : startSeq(); });
 $('#recBtn').addEventListener('click', () => { seq.rec = !seq.rec; if (seq.rec && !seq.playing) startSeq(); renderTransport(); });
-$('#clearBtn').addEventListener('click', () => { pattern = emptyPattern(); save(); renderSteps(); });
+$('#clearBtn').addEventListener('click', () => { pattern = emptyPattern(); melody = emptyMelody(); save(); renderSteps(); });
+function setTone(v){
+  state.tone = clamp(v, -1, 1); save();
+  if (seqVoice) seqVoice.v.setTone(toneAl(seqVoice.al), seqVoice.pr);
+}
+$('#toneRange').addEventListener('input', e => setTone(+e.target.value));
+$('#toneRange').addEventListener('dblclick', e => { e.target.value = 0; setTone(0); });
 $('#settingsBtn').addEventListener('click', () => { renderSheet(); $('#sheet').hidden = false; });
 $('#closeSheet').addEventListener('click', () => { $('#sheet').hidden = true; });
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#sheet').hidden = true; });
