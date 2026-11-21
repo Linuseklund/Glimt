@@ -245,8 +245,19 @@ const PRESETS = {
   glas:  { name:'Glas',   osc:['triangle','sine'],     detune:[0,1200],  mix:[0.7,0.28], a:0.004, d:0.9, s:0.35, r:1.4, cut:1500, range:4.2, q:2 },
   strang:{ name:'Sträng', osc:['sawtooth','sawtooth'], detune:[-7,7],    mix:[0.38,0.38],a:0.003, d:0.35,s:0.18, r:0.7, cut:520,  range:5.2, q:7 },
   lead:  { name:'Lead',   osc:['square','sawtooth'],   detune:[0,-1200], mix:[0.32,0.3], a:0.012, d:0.25,s:0.85, r:0.25,cut:420,  range:5.4, q:9 },
-  pad:   { name:'Pad',    osc:['sawtooth','sawtooth'], detune:[-14,14],  mix:[0.3,0.3],  a:0.35,  d:1.0, s:0.85, r:2.4, cut:320,  range:4.4, q:1.5 }
+  pad:   { name:'Pad',    osc:['sawtooth','sawtooth'], detune:[-14,14],  mix:[0.3,0.3],  a:0.35,  d:1.0, s:0.85, r:2.4, cut:320,  range:4.4, q:1.5 },
+  /* Acid: very resonant low-pass, a snappy filter envelope on every hit, and distortion after the filter.
+     Pressure = accent (deeper envelope, more resonance), along the strip = cutoff, sideways glide = slide. */
+  acid:  { name:'Acid',   osc:['sawtooth'],            detune:[0],       mix:[0.42],     a:0.003, d:0.5, s:0.75, r:0.12, cut:110,  range:5.6, q:17, fenv:4.2, fdec:0.22, drive:0.65 },
+  acidsq:{ name:'Acid fyrkant', osc:['square'],        detune:[0],       mix:[0.36],     a:0.003, d:0.4, s:0.7,  r:0.12, cut:95,   range:5.6, q:19, fenv:4.8, fdec:0.16, drive:0.85 }
 };
+const curveCache = {};
+function acidCurve(k){
+  if (curveCache[k]) return curveCache[k];
+  const n = 2048, c = new Float32Array(n), a = 1 + k * 14;
+  for (let i = 0; i < n; i++){ const x = i * 2 / n - 1; c[i] = (Math.tanh(a * x) + 0.25 * Math.tanh(a * 3 * x) ) / (Math.tanh(a) + 0.25 * Math.tanh(a * 3)); }
+  return (curveCache[k] = c);
+}
 const KITS = {
   klassisk:{ name:'Klassisk', lp:20000, drive:0 },
   tolv:    { name:'808',      lp:20000, drive:0 },
@@ -344,7 +355,19 @@ function makeVoice(f, along, press){
     const o = ac.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = p.detune[i];
     const g = ac.createGain(); g.gain.value = p.mix[i]; o.connect(g); g.connect(filt); o.start(t); return o;
   });
-  filt.connect(vca); vca.connect(amp); amp.connect(voiceBus);
+  if (p.drive){
+    const sh = ac.createWaveShaper(); sh.curve = acidCurve(p.drive); sh.oversample = '2x';
+    const post = ac.createGain(); post.gain.value = 0.55;
+    filt.connect(sh); sh.connect(post); post.connect(vca);
+  } else filt.connect(vca);
+  vca.connect(amp); amp.connect(voiceBus);
+  if (p.fenv){
+    // the squelch: sweep the filter down from far above the cutoff on every new note
+    const accent = press > 0.8;
+    filt.detune.setValueAtTime(1200 * p.fenv * (0.45 + 0.75 * press), t);
+    filt.detune.setTargetAtTime(0, t + 0.004, (accent ? p.fdec * 0.7 : p.fdec) / 3);
+    filt.Q.value = p.q * (0.75 + 0.45 * press);
+  }
   vca.gain.setValueAtTime(0, t);
   vca.gain.linearRampToValueAtTime(1, t + p.a);
   vca.gain.setTargetAtTime(p.s, t + p.a, p.d / 3);
@@ -354,6 +377,7 @@ function makeVoice(f, along, press){
       const n = ac.currentTime;
       filt.frequency.setTargetAtTime(cutoff(p, along, press), n, 0.02);
       amp.gain.setTargetAtTime(pressGain(press), n, 0.03);
+      if (p.fenv) filt.Q.setTargetAtTime(p.q * (0.75 + 0.45 * press), n, 0.05);
     },
     release(){
       const n = ac.currentTime;
@@ -426,6 +450,7 @@ const BEATS = {
   rak:    { name:'Rak',     bpm:100, p:{ 0:[[0,1],[8,0.9],[10,0.6]], 1:[[4,0.9],[12,0.9]], 3:[[0,.5],[2,.4],[4,.5],[6,.4],[8,.5],[10,.4],[12,.5],[14,.4]] } },
   hiphop: { name:'Hiphop',  bpm:88,  p:{ 0:[[0,1],[7,0.8],[10,0.9]], 1:[[4,0.9],[12,0.95]], 3:[[0,.5],[2,.35],[4,.5],[6,.35],[8,.5],[10,.35],[12,.5]], 4:[[14,.45]], 8:[[15,.3]] } },
   house:  { name:'House',   bpm:124, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.8],[12,.8]], 4:[[2,.45],[6,.45],[10,.45],[14,.45]], 9:[[1,.3],[3,.3],[5,.3],[7,.3],[9,.3],[11,.3],[13,.3],[15,.3]] } },
+  acid:   { name:'Acid',    bpm:128, p:{ 0:[[0,1],[4,1],[8,1],[12,1]], 2:[[4,.7],[12,.7]], 4:[[2,.5],[6,.5],[10,.5],[14,.5]], 3:[[0,.3],[1,.25],[3,.3],[5,.25],[7,.3],[9,.25],[11,.3],[13,.25],[15,.3]], 8:[[3,.35],[11,.35]] } },
   trap:   { name:'Trap',    bpm:140, p:{ 14:[[0,1],[11,0.9]], 0:[[0,0.8],[11,0.7]], 15:[[8,0.9]], 2:[[8,0.6]], 3:[[0,.4],[2,.4],[4,.4],[6,.4],[7,.3],[8,.4],[10,.4],[12,.4],[13,.3],[14,.4],[15,.3]] } }
 };
 

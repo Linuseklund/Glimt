@@ -4,7 +4,7 @@ En tryckkänslig LED-spelyta för mobil och iPad, inspirerad av MPE-kontroller s
 
 - **Strängar:** glid (pitch bend), klangfärg längs strängen och tryck (Apple Pencil eller fingeryta)
 - **Trummor:** 16 syntetiserade ljud i tre trumset (Klassisk, 808, Lo-fi), som trumrad eller hela ytan som 4×4
-- **Sekvenserare:** 16 steg, tempo 60–180 BPM, inspelning i realtid och färdiga komp (Rak, Hiphop, House, Trap)
-- Fyra syntljud, valfri tonart och skala, rumsklang
+- **Sekvenserare:** 16 steg, tempo 60–180 BPM, inspelning i realtid och färdiga komp (Rak, Hiphop, House, Acid, Trap)
+- Sex syntljud, bland annat två acid-ljud med resonant filtersvep och distorsion, valfri tonart och skala, rumsklang
 
 Öppna sidan i Safari och välj Dela → Lägg till på hemskärmen för helskärm.
