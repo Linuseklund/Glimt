@@ -78,9 +78,12 @@ body{
 #recBtn[aria-pressed="true"] .recdot{opacity:1;box-shadow:0 0 10px var(--rec);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.45}}
 .steps{flex:1;min-width:0;display:grid;grid-template-columns:repeat(16,1fr);gap:3px;align-items:center;height:22px}
-.step{height:14px;border-radius:4px;background:rgba(191,239,255,.07);transition:background .06s}
+.step{height:14px;border-radius:4px;background:rgba(191,239,255,.07);transition:background .06s;cursor:pointer;touch-action:manipulation}
 .step:nth-child(4n+1){background:rgba(191,239,255,.13)}
-.step.has{background:rgba(255,179,92,.45)}
+.step.has{background:rgba(255,179,92,.22)}
+.step.sel,.steps.two .step.sel{background:var(--amber)}
+.drumsel{flex:none;appearance:none;-webkit-appearance:none;height:30px;max-width:92px;padding:0 10px;border-radius:8px;border:1px solid var(--amber);background:var(--rail);color:var(--amber);font:600 11px var(--font-mono);letter-spacing:.04em}
+@media (pointer:coarse){ .steps{height:30px} .step{height:26px} .steps.two{height:46px} .steps.two .step{height:20px} }
 .step.now{background:var(--led);box-shadow:0 0 8px rgba(191,239,255,.8)}
 .step.has.now{background:#fff3e3;box-shadow:0 0 10px rgba(255,179,92,.9)}
 .step.mel{box-shadow:inset 0 -5px 0 rgba(191,239,255,.85)}
@@ -94,7 +97,7 @@ body{
 .steps.two{grid-template-rows:repeat(2,1fr);height:30px;row-gap:3px}
 .steps.two .step{height:12px}
 .steps.two .step:nth-child(16n+1){background:rgba(191,239,255,.2)}
-.steps.two .step.has{background:rgba(255,179,92,.45)}
+.steps.two .step.has{background:rgba(255,179,92,.22)}
 .steps.two .step.now{background:var(--led)}
 .steps.two .step.has.now{background:#fff3e3}
 .groove{display:flex;gap:10px;flex:none}
@@ -104,12 +107,15 @@ body{
 .groove input[type=range]{grid-column:1 / -1;width:84px;height:22px;accent-color:var(--amber)}
 @media (max-width:900px){ .groove{display:none} }
 @media (max-width:560px){
+  .drumsel{order:9}
   .brand span,.status,.rail .btn span{display:none}
   .rail{justify-content:space-between}
   .seqbar{flex-wrap:wrap;row-gap:6px}
   .seqbar .break{display:block;order:8;flex-basis:100%;height:0}
   .steps{order:9}
-  .tone{order:10}
+  .tone{order:10;flex-basis:100%}
+  .tone input[type=range]{flex:1;width:auto}
+  .steps{flex:1}
   .seqbar .spacer{flex:1}
 }
 /* ---------- deck ---------- */
@@ -294,7 +300,8 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 3h6l4 18H5z"/><path d="M12 16l5-9"/><path d="M8 16h8"/></svg>
     </button>
     <span class="break"></span>
-    <div class="steps" id="steps" aria-hidden="true"></div>
+    <select id="selDrum" class="drumsel" aria-label="Trumljud att lägga till i stegen"></select>
+    <div class="steps" id="steps" role="group" aria-label="Steg: tryck för att lägga till eller ta bort det valda trumljudet"></div>
     <div class="groove">
       <label for="swingQuick">Swing <output id="swingQuickOut"></output><input type="range" id="swingQuick" min="0" max="1" step="0.01"></label>
       <label for="humanQuick">Human <output id="humanQuickOut"></output><input type="range" id="humanQuick" min="0" max="1" step="0.01"></label>
@@ -383,11 +390,12 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <div class="mixer-wrap"><div class="mixer" id="mixer"></div></div>
     </div>
     <div id="gridView" hidden>
+      <div class="field" id="gridChainField" hidden><span class="label">Eller ändra bara ett steg i kedjan</span><div class="seg" id="gridChain"></div></div>
       <div class="gridhead">
-        <div class="field"><span class="label">Mönster</span><div class="seg keys" id="gridPat"></div></div>
+        <div class="field"><span class="label">Ändra mönster (överallt där det används)</span><div class="seg keys" id="gridPat"></div></div>
         <div class="field"><span class="label">Styrka på nya slag</span><div class="seg" id="gridVel"></div></div>
       </div>
-      <p class="hint">Tryck i en ruta för att lägga till ett trumslag, tryck på ett slag för att ta bort det. Melodins toner kan tas bort här, nya spelar du in på strängarna. Ändringar i ett mönster gäller överallt där det används i kedjan.</p>
+      <p class="hint">Tryck i en ruta för att lägga till ett trumslag, tryck på ett slag för att ta bort det. Melodins toner kan tas bort här, nya spelar du in på strängarna. Ett mönster som står på flera ställen i kedjan ändras överallt. Vill du bara ändra ett ställe, välj det steget i kedjan, så får det en egen kopia.</p>
       <div class="grid-wrap"><div class="grid" id="grid"></div></div>
     </div>
     <div id="listView" hidden>
@@ -486,7 +494,7 @@ const SURFACES = { delad:'Strängar + trummor', strangar:'Bara strängar', trumm
 
 /* ---------------- settings ---------------- */
 const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8,
-  surface:'delad', kit:'klassisk', bpm:100, tone:0, swing:0, human:0, metro:false, metroRec:false, steps:32, pressSens:0.6, padVel:'tryck',
+  surface:'delad', kit:'klassisk', bpm:100, tone:0, swing:0, human:0, metro:false, metroRec:false, steps:32, pressSens:0.6, padVel:'tryck', selDrum:0,
   pattern:null, melody:null, toneAuto:null };
 let state = { ...DEFAULTS };
 let stored = null;
@@ -731,6 +739,7 @@ const secondHalfEmpty = () => { syncSlot(); return secondHalfEmptyOf(patterns[cu
 function copyFirstHalf(){ syncSlot(); copyFirstHalfOf(patterns[cur]); }
 const slotHas = P => P.pattern.some(st => st.length) || P.melody.some(Boolean);
 state.human = clamp(+state.human || 0, 0, 1);
+state.selDrum = clamp(state.selDrum | 0, 0, 15);
 state.pressSens = clamp(Number.isFinite(+state.pressSens) ? +state.pressSens : 0.6, 0, 1);
 if (!['tryck', 'position', 'fast'].includes(state.padVel)) state.padVel = 'tryck';
 const TRK_DEFAULT = () => ({ vol:1, tune:0, dec:1, mute:false });
@@ -836,7 +845,6 @@ function switchSlot(i){
   syncSlot(); cur = i;
   const P = patterns[i]; pattern = P.pattern; melody = P.melody; toneAuto = P.toneAuto; state.steps = P.steps;
   save(); renderSteps(); if (!$('#sheet').hidden) renderSheet();
-  if (!$('#tracks').hidden && trkTab === 'grid' && seq.playing){ gridPat = cur; renderGrid(); }
 }
 function recordNoteOn(t, i, along, press, legato){
   if (!seq.playing || !seq.rec) return;
@@ -1092,6 +1100,7 @@ function noteDown(e){
     if (pad){
       const v = 0.12 + 0.88 * Math.pow(press, 1.15), t = ac.currentTime + 0.005;
       playDrum(pad.idx, t, v); padFlash[pad.idx] = 1;
+      if (state.selDrum !== pad.idx){ state.selDrum = pad.idx; $('#selDrum').value = pad.idx; renderSteps(); }
       recordHit(pad.idx, v, t);
       if (state.surface === 'trummor') ripples.push({ x, y, t:performance.now(), p:0.5 + 0.5 * press, pad });
     }
@@ -1287,6 +1296,18 @@ function frame(now){
 
 /* ---------------- UI ---------------- */
 const stepsEl = $('#steps');
+/* the step row edits the selected drum in the pattern that is playing: tap a step to add or remove a hit */
+DRUMS.forEach((d, i) => { const o = document.createElement('option'); o.value = i; o.textContent = d.name; $('#selDrum').appendChild(o); });
+$('#selDrum').value = state.selDrum;
+$('#selDrum').addEventListener('change', e => { state.selDrum = +e.target.value; save(); renderSteps(); try { ensureAudio(); playDrum(state.selDrum, ac.currentTime + 0.005, 0.8); } catch (err) {} });
+stepsEl.addEventListener('click', e => {
+  const el = e.target.closest('.step'); if (!el) return;
+  const s = [...stepsEl.children].indexOf(el), idx = state.selDrum;
+  const at = pattern[s].findIndex(n => n[0] === idx);
+  if (at >= 0) pattern[s].splice(at, 1); else pattern[s].push([idx, 0.8]);
+  save(); renderSteps();
+  if (at < 0) try { ensureAudio(); playDrum(idx, ac.currentTime + 0.005, 0.8); padFlash[idx] = 1; requestFrame(); } catch (err) {}
+});
 function buildSteps(){
   if (stepsEl.children.length === L()) return;
   stepsEl.innerHTML = '';
@@ -1297,6 +1318,7 @@ function renderSteps(){
   buildSteps();
   [...stepsEl.children].forEach((el, i) => {
     el.classList.toggle('has', pattern[i].length > 0);
+    el.classList.toggle('sel', pattern[i].some(n => n[0] === state.selDrum));
     el.classList.toggle('mel', !!melody[i]);
     el.classList.toggle('mv', !!(melody[i] && melody[i].mv && melody[i].mv.length) || toneAuto.slice(i * 4, i * 4 + 4).some(v => v !== null));
     el.classList.toggle('now', seq.playing && i === seq.current);
@@ -1456,20 +1478,40 @@ let trkTab = 'mixer', mixLeds = [];
 function renderTrkTabs(){ seg($('#trkTabs'), [['mixer', 'Mixer'], ['grid', 'Steg'], ['list', 'Spår och ljud']], trkTab, v => { trkTab = v; renderTrkTabs(); showTrk(); }); }
 function showTrk(){
   $('#mixerView').hidden = trkTab !== 'mixer'; $('#gridView').hidden = trkTab !== 'grid'; $('#listView').hidden = trkTab !== 'list';
-  if (trkTab === 'mixer') renderMixer(); else if (trkTab === 'grid'){ gridPat = cur; renderGrid(); } else renderTracks();
+  if (trkTab === 'mixer') renderMixer(); else if (trkTab === 'grid'){ gridTarget = state.chainOn && seq.playing ? { chain:seq.chainPos } : { pat:cur }; renderGrid(); } else renderTracks();
 }
 
 /* ---------------- step editor ---------------- */
-let gridPat = 0, gridVel = 0.8, gridCols = [], gridNow = -1;
+let gridTarget = { pat:0 }, gridVel = 0.8, gridCols = [], gridNow = -1;
+const gridPatIdx = () => gridTarget.chain !== undefined ? state.chain[gridTarget.chain] : gridTarget.pat;
+function freeSlot(){ syncSlot(); for (let i = 0; i < NPAT; i++) if (i !== cur && !slotHas(patterns[i]) && !state.chain.includes(i)) return i; return -1; }
+/* Before the first edit of a single chain step whose pattern also plays elsewhere in the chain,
+   give that step its own copy in a free slot so the other steps stay as they were. */
+function ensureOwnCopy(){
+  if (gridTarget.chain === undefined) return true;
+  const k = gridTarget.chain, src = state.chain[k];
+  if (state.chain.filter(x => x === src).length < 2) return true;
+  const dst = freeSlot();
+  if (dst < 0){ toast('Alla åtta mönster används. Töm ett mönster för att kunna ge kedjesteget en egen kopia.'); return false; }
+  syncSlot(); patterns[dst] = parseSlot(serSlot(patterns[src]));
+  state.chain[k] = dst;
+  if (seq.playing && state.chainOn && seq.chainPos === k && cur === src) queued = dst;   // pick it up at the next loop
+  save();
+  toast(`Steg ${k + 1} i kedjan har nu en egen kopia: mönster ${PAT_NAMES[dst]}.`);
+  return 'copied';
+}
 const VELS = [[0.45, 'Svag'], [0.8, 'Normal'], [1, 'Stark']];
-function gridSlot(){ syncSlot(); return patterns[gridPat]; }
+function gridSlot(){ syncSlot(); return patterns[gridPatIdx()]; }
 function renderGrid(){
-  seg($('#gridPat'), PAT_NAMES.split('').map((n, i) => [i, n]), gridPat, i => { gridPat = i; renderGrid(); });
+  if (gridTarget.chain !== undefined && gridTarget.chain >= state.chain.length) gridTarget = { pat:cur };
+  seg($('#gridPat'), PAT_NAMES.split('').map((n, i) => [i, n]), gridTarget.pat, i => { gridTarget = { pat:i }; renderGrid(); });
+  $('#gridChainField').hidden = !state.chain.length;
+  seg($('#gridChain'), state.chain.map((pi, k) => [k, `${k + 1}·${PAT_NAMES[pi]}`]), gridTarget.chain, k => { gridTarget = { chain:k }; renderGrid(); });
   seg($('#gridVel'), VELS, gridVel, v => { gridVel = v; renderGrid(); });
   const P = gridSlot(), n = P.steps, el = $('#grid');
   el.style.gridTemplateColumns = `72px repeat(${n}, 26px)`;
   el.innerHTML = ''; gridCols = Array.from({ length:n }, () => []); gridNow = -1;
-  const head = document.createElement('span'); head.className = 'gl'; head.textContent = PAT_NAMES[gridPat] + (gridPat === cur ? ' · spelas' : ''); el.append(head);
+  const head = document.createElement('span'); head.className = 'gl'; head.textContent = gridTarget.chain !== undefined ? `Steg ${gridTarget.chain + 1} · ${PAT_NAMES[gridPatIdx()]}` : `Mönster ${PAT_NAMES[gridPatIdx()]}`; el.append(head);
   for (let s = 0; s < n; s++){ const c = document.createElement('span'); c.className = 'gn' + (s % 4 === 0 ? ' beat' : ''); c.textContent = s + 1; el.append(c); gridCols[s].push(c); }
   const rows = [{ key:'mel', name:'MELODI' }].concat(DRUMS.map((d, i) => ({ key:i, name:d.name })));
   rows.forEach(r => {
@@ -1500,23 +1542,29 @@ function paintCell(c, P){
 }
 $('#grid').addEventListener('click', e => {
   const c = e.target.closest('.gc'); if (!c) return;
-  const P = gridSlot(), s = +c.dataset.s, k = c.dataset.k;
-  if (k === 'mel'){
-    if (!P.melody[s]){ toast('Nya toner spelar du in på strängarna med ●.'); return; }
-    P.melody[s] = null;
-  } else {
+  const s = +c.dataset.s, k = c.dataset.k;
+  if (k === 'mel' && !gridSlot().melody[s]){ toast('Nya toner spelar du in på strängarna med ●.'); return; }
+  const own = ensureOwnCopy(); if (!own) return;
+  const P = gridSlot();
+  let added = -1;
+  if (k === 'mel') P.melody[s] = null;
+  else {
     const idx = +k, at = P.pattern[s].findIndex(x => x[0] === idx);
-    if (at >= 0) P.pattern[s].splice(at, 1);
-    else { P.pattern[s].push([idx, gridVel]); ensureAudio(); playDrum(idx, ac.currentTime + 0.005, gridVel); padFlash[idx] = 1; requestFrame(); }
+    if (at >= 0) P.pattern[s].splice(at, 1); else { P.pattern[s].push([idx, gridVel]); added = idx; }
   }
-  paintCell(c, P);
-  const lab = c.parentNode.children[[...c.parentNode.children].indexOf(c) - s - 1];
-  if (lab) lab.classList.toggle('used', k === 'mel' ? P.melody.slice(0, P.steps).some(Boolean) : P.pattern.slice(0, P.steps).some(st => st.some(x => x[0] === +k)));
   save(); renderSteps();
+  if (own === 'copied'){ renderGrid(); }
+  else {
+    paintCell(c, P);
+    const lab = c.parentNode.children[[...c.parentNode.children].indexOf(c) - s - 1];
+    if (lab) lab.classList.toggle('used', k === 'mel' ? P.melody.slice(0, P.steps).some(Boolean) : P.pattern.slice(0, P.steps).some(st => st.some(x => x[0] === +k)));
+  }
+  if (added >= 0) try { ensureAudio(); playDrum(added, ac.currentTime + 0.005, gridVel); padFlash[added] = 1; requestFrame(); } catch (err) {}
 });
 function gridPlayhead(){
   if ($('#tracks').hidden || trkTab !== 'grid' || !gridCols.length) return;
-  const s = seq.playing && gridPat === cur ? seq.current : -1;
+  const playing = gridTarget.chain !== undefined ? state.chainOn && seq.chainPos === gridTarget.chain && state.chain[gridTarget.chain] === cur : gridTarget.pat === cur;
+  const s = seq.playing && playing ? seq.current : -1;
   if (s === gridNow) return;
   if (gridNow >= 0 && gridCols[gridNow]) gridCols[gridNow].forEach(c => c.classList.remove('now'));
   if (s >= 0 && gridCols[s]) gridCols[s].forEach(c => c.classList.add('now'));
