@@ -58,6 +58,7 @@ body{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status strong{color:var(--ink);font-weight:600}
 .status .note{color:var(--amber)}
+.pressout{flex:none;font:600 11px var(--font-mono);color:var(--amber);font-variant-numeric:tabular-nums}
 .group{display:flex;align-items:center;gap:4px;flex:none}
 .btn{
   appearance:none;border:1px solid var(--line);background:var(--rail);color:var(--ink);
@@ -181,7 +182,7 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
 #chainInfo{font:600 11px var(--font-mono);margin-left:4px}
 #pasteBtn:disabled{opacity:.4;cursor:default}
 .chain{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;border:1px dashed var(--line);border-radius:12px}
-#chainAdd button{flex:1 0 calc(12.5% - 6px);min-width:32px}
+#chainAdd button,#gridPat button{flex:1 0 calc(12.5% - 6px);min-width:30px}
 .chain:empty::before{content:"Kedjan är tom. Lägg till mönster nedan.";color:var(--dim);font-size:13px;align-self:center}
 .chain button{appearance:none;width:36px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--rail);color:var(--ink);
   font:600 13px var(--font-mono);cursor:pointer;position:relative}
@@ -222,6 +223,22 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
 .ch.drum:not(.used) .nm{color:var(--dim)}
 .ch.muted .fill,.ch.muted .cap{opacity:.3}
 .ch .chip{height:28px;min-width:32px;padding:0 8px}
+/* ---------- step editor ---------- */
+.gridhead{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-wrap{overflow-x:auto;margin-inline:-8px;padding:2px 8px 8px;-webkit-overflow-scrolling:touch}
+.grid{display:grid;gap:3px;width:max-content;align-items:center}
+.gl{position:sticky;left:0;z-index:1;background:var(--panel);font:600 10px var(--font-mono);letter-spacing:.04em;color:var(--dim);padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl.used{color:var(--ink)}
+.gn{font:400 9px var(--font-mono);color:var(--dim);text-align:center}
+.gn.beat{color:var(--ink)}
+.gc{appearance:none;width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--rail);cursor:pointer;padding:0;
+  font:600 9px var(--font-mono);color:#05222c;touch-action:manipulation}
+.gc.beat{background:var(--raise)}
+.gc.on{background:var(--amber);border-color:var(--amber);opacity:var(--v)}
+.gc.m.on{background:var(--led);border-color:var(--led);opacity:1}
+.gc.now{box-shadow:0 0 0 2px var(--led)}
+.gn.now{color:var(--led)}
+@media (max-width:420px){ .gridhead{grid-template-columns:1fr} }
 /* ---------- tracks ---------- */
 .trk-list{display:flex;flex-direction:column;gap:6px}
 .trk{border:1px solid var(--line);border-radius:12px;background:var(--rail)}
@@ -252,6 +269,7 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
   <header class="rail">
     <div class="brand"><b>glimt</b><span>spelyta</span></div>
     <div class="status" id="status" aria-live="polite"></div>
+    <span class="pressout" id="pressOut" hidden></span>
     <div class="group">
       <button class="btn" id="octDown" aria-label="Oktav ner">−</button>
       <div class="oct"><small>Oktav</small><span id="octLabel">3</span></div>
@@ -364,6 +382,14 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <p class="hint">Dra en fader upp eller ner, dubbeltryck för att återställa. M tystar instrumentet i slingan och lampan blinkar när det spelar. Svep i sidled för fler instrument.</p>
       <div class="mixer-wrap"><div class="mixer" id="mixer"></div></div>
     </div>
+    <div id="gridView" hidden>
+      <div class="gridhead">
+        <div class="field"><span class="label">Mönster</span><div class="seg keys" id="gridPat"></div></div>
+        <div class="field"><span class="label">Styrka på nya slag</span><div class="seg" id="gridVel"></div></div>
+      </div>
+      <p class="hint">Tryck i en ruta för att lägga till ett trumslag, tryck på ett slag för att ta bort det. Melodins toner kan tas bort här, nya spelar du in på strängarna. Ändringar i ett mönster gäller överallt där det används i kedjan.</p>
+      <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+    </div>
     <div id="listView" hidden>
       <p class="hint">Tryck på ett spår för att justera ljudet. M tystar spåret i slingan, Rensa tar bort det som är inspelat på spåret.</p>
       <div class="trk-list" id="trackList"></div>
@@ -402,6 +428,12 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <label class="switch" for="metroRecChk">Bara vid inspelning <input type="checkbox" id="metroRecChk"></label>
     </div>
     <p class="hint">Med ● påslaget spelas även rörelser in: hur fingret glider och trycker under en ton, och hur du drar i Klang. Steg med rörelser får en vit ram.</p>
+
+    <h3>Tryck</h3>
+    <div class="field"><label class="label" for="sensRange">Tryckkänslighet <output id="sensOut"></output></label><input type="range" id="sensRange" min="0" max="1" step="0.01"></div>
+    <div class="field"><span class="label">Styrka på trumpads</span><div class="seg" id="padVelSeg"></div></div>
+    <p class="hint" id="pressDiag"></p>
+    <div class="seg"><button type="button" id="calibReset">Kalibrera om trycket</button></div>
 
     <h3>Mix</h3>
     <div class="row2">
@@ -454,7 +486,7 @@ const SURFACES = { delad:'Strängar + trummor', strangar:'Bara strängar', trumm
 
 /* ---------------- settings ---------------- */
 const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8,
-  surface:'delad', kit:'klassisk', bpm:100, tone:0, swing:0, human:0, metro:false, metroRec:false, steps:32,
+  surface:'delad', kit:'klassisk', bpm:100, tone:0, swing:0, human:0, metro:false, metroRec:false, steps:32, pressSens:0.6, padVel:'tryck',
   pattern:null, melody:null, toneAuto:null };
 let state = { ...DEFAULTS };
 let stored = null;
@@ -535,8 +567,9 @@ function hold(param, t){
   if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
   else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
 }
-const pressGain = p => 0.07 + 0.23 * p;
-function cutoff(p, along, press){ return clamp(p.cut * Math.pow(2, along * p.range) * (0.65 + 0.7 * press), 60, 18000); }
+// pressure spans about 20 dB of level and more than a doubling of the filter, so it is clearly audible
+const pressGain = p => 0.025 + 0.32 * Math.pow(p, 1.3);
+function cutoff(p, along, press){ return clamp(p.cut * Math.pow(2, along * p.range) * (0.45 + 1.1 * press), 60, 18000); }
 
 function makeVoice(f, along, press, when){
   const b = PRESETS[state.sound], y = state.syn, t = Math.max(when ?? 0, ac.currentTime);
@@ -698,6 +731,8 @@ const secondHalfEmpty = () => { syncSlot(); return secondHalfEmptyOf(patterns[cu
 function copyFirstHalf(){ syncSlot(); copyFirstHalfOf(patterns[cur]); }
 const slotHas = P => P.pattern.some(st => st.length) || P.melody.some(Boolean);
 state.human = clamp(+state.human || 0, 0, 1);
+state.pressSens = clamp(Number.isFinite(+state.pressSens) ? +state.pressSens : 0.6, 0, 1);
+if (!['tryck', 'position', 'fast'].includes(state.padVel)) state.padVel = 'tryck';
 const TRK_DEFAULT = () => ({ vol:1, tune:0, dec:1, mute:false });
 const SYN_DEFAULT = () => ({ vol:1, cut:0, res:1, len:1, mute:false });
 state.drumVol = clamp(Number.isFinite(+state.drumVol) ? +state.drumVol : 1, 0, 1.5);
@@ -801,6 +836,7 @@ function switchSlot(i){
   syncSlot(); cur = i;
   const P = patterns[i]; pattern = P.pattern; melody = P.melody; toneAuto = P.toneAuto; state.steps = P.steps;
   save(); renderSteps(); if (!$('#sheet').hidden) renderSheet();
+  if (!$('#tracks').hidden && trkTab === 'grid' && seq.playing){ gridPat = cur; renderGrid(); }
 }
 function recordNoteOn(t, i, along, press, legato){
   if (!seq.playing || !seq.rec) return;
@@ -973,12 +1009,52 @@ function alongOf(x, y){
   return portrait ? clamp((x - area.x - LABEL) / (area.w - LABEL), 0, 1)
                   : clamp(1 - (y - area.y) / (area.h - LABEL), 0, 1);
 }
+/* Pressure. Fingers on iPhone/iPad report contact size, not force, and only coarsely. We read every source
+   there is (pointer size, Touch.radiusX/Y, Touch.force on 3D Touch, Apple Pencil pressure), learn this
+   player's softest and firmest contact size as they play, and stretch that range to 0–1. */
+const liveTouches = new Map();
+function trackTouches(e){
+  for (const t of e.changedTouches){
+    const r = 2 * Math.max(t.radiusX || 0, t.radiusY || 0, t.webkitRadiusX || 0, t.webkitRadiusY || 0);
+    liveTouches.set(t.identifier, { x:t.clientX, y:t.clientY, r, f:t.force || 0 });
+  }
+}
+function dropTouches(e){ for (const t of e.changedTouches) liveTouches.delete(t.identifier); }
+function nearestTouch(x, y){
+  let best = null, bd = 60;
+  liveTouches.forEach(t => { const d = Math.hypot(t.x - x, t.y - y); if (d < bd){ bd = d; best = t; } });
+  return best;
+}
+let calib = { lo:20, hi:38, n:0 };
+try { const c = JSON.parse(localStorage.getItem('glimt-calib') || 'null'); if (c && c.hi > c.lo) calib = c; } catch (e) {}
+function calibrate(r){
+  // fast toward a new extreme, slow drift back so one odd reading does not stick forever
+  calib.lo += r < calib.lo ? (r - calib.lo) * 0.5 : (r - calib.lo) * 0.003;
+  calib.hi += r > calib.hi ? (r - calib.hi) * 0.5 : (r - calib.hi) * 0.003;
+  if (calib.hi - calib.lo < 6) calib.hi = calib.lo + 6;
+  if (++calib.n % 20 === 0) try { localStorage.setItem('glimt-calib', JSON.stringify(calib)); } catch (e) {}
+}
+function shapePress(x){
+  const gamma = 1.6 - 1.2 * state.pressSens;           // high sensitivity lifts light touches
+  return 0.06 + 0.94 * Math.pow(clamp(x, 0, 1), gamma);
+}
+let lastPress = null;
 function pressureOf(e){
-  if (e.pointerType === 'pen' && e.pressure > 0) return clamp(e.pressure * 1.25, 0.12, 1);
-  if (e.pointerType === 'touch' && e.pressure > 0 && e.pressure !== 0.5 && e.pressure !== 1) return clamp(e.pressure, 0.12, 1);
-  const w = Math.max(e.width || 0, e.height || 0);
-  if (e.pointerType === 'touch' && w > 2) return clamp((w - 12) / 38, 0.3, 1);
-  return 0.75;
+  let p;
+  if (e.pointerType === 'pen' && e.pressure > 0) p = shapePress(e.pressure);
+  else if (e.pointerType === 'mouse') p = 0.75;
+  else {
+    let r = Math.max(e.width || 0, e.height || 0), f = 0;
+    if (r <= 2) r = 0;
+    if (e.pressure > 0 && e.pressure !== 0.5 && e.pressure !== 1) f = e.pressure;
+    const t = nearestTouch(e.clientX, e.clientY);
+    if (t){ r = Math.max(r, t.r); if (t.f > 0 && t.f < 1) f = Math.max(f, t.f); }
+    if (f > 0) p = shapePress(f);
+    else if (r > 0){ calibrate(r); p = shapePress((r - calib.lo) / (calib.hi - calib.lo)); }
+    else p = 0.75;
+  }
+  lastPress = p;
+  return p;
 }
 function padAt(x, y){
   const tol = 4;
@@ -997,16 +1073,29 @@ canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   ensureAudio();
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
-  const { x, y } = local(e), press = pressureOf(e);
+  // on touch, wait one tick so the matching touchstart has delivered the contact size
+  if (e.pointerType === 'touch' && !(Math.max(e.width || 0, e.height || 0) > 2)) setTimeout(() => noteDown(e), 0);
+  else noteDown(e);
+}, { passive:false });
+function noteDown(e){
+  if (!ac){ upEarly.delete(e.pointerId); return; }
+  const early = upEarly.delete(e.pointerId);
+  const { x, y } = local(e);
   const pad = padAt(x, y);
+  let press = pressureOf(e);
+  if (pad && state.padVel === 'fast') press = 0.8;
+  if (pad && state.padVel === 'position'){
+    const d = Math.hypot(x - (pad.x + pad.w / 2), y - (pad.y + pad.h / 2)) / (Math.hypot(pad.w, pad.h) / 2);
+    press = shapePress(1 - d);                         // the centre of the pad hits hardest
+  }
   if (pad || !strips.length || y < area.y - 2){
     if (pad){
-      const v = 0.35 + 0.65 * press, t = ac.currentTime + 0.005;
+      const v = 0.12 + 0.88 * Math.pow(press, 1.15), t = ac.currentTime + 0.005;
       playDrum(pad.idx, t, v); padFlash[pad.idx] = 1;
       recordHit(pad.idx, v, t);
       if (state.surface === 'trummor') ripples.push({ x, y, t:performance.now(), p:0.5 + 0.5 * press, pad });
     }
-    touches.set(e.pointerId, { kind:'drum' });
+    if (!early) touches.set(e.pointerId, { kind:'drum' });
     requestFrame(); return;
   }
   const cross = crossOf(x, y), i = clamp(Math.round(cross), 0, N - 1), along = alongOf(x, y);
@@ -1016,9 +1105,10 @@ canvas.addEventListener('pointerdown', e => {
   recordNoteOn(t, i, along, press, legato);
   touches.set(e.pointerId, t);
   ripples.push({ x, y, t:performance.now(), p:0.4 + 0.6 * press });
-  setNote(m);
+  setNote(m); showPress(press);
+  if (early) end({ pointerId:e.pointerId, type:'pointerup' });
   requestFrame();
-}, { passive:false });
+}
 
 canvas.addEventListener('pointermove', e => {
   const t = touches.get(e.pointerId); if (!t || t.kind !== 'strip') return;
@@ -1031,12 +1121,15 @@ canvas.addEventListener('pointermove', e => {
   else { t.cur = clamp(Math.round(cross), 0, N - 1); m = noteOf(t.cur); }
   if (Math.abs(m - t.m) > 0.001){ t.m = m; t.voice.setFreq(freq(m)); }
   t.voice.setTone(t.along, t.press);
+  showPress(t.press);
   recordMove(t, state.glide ? clamp(t.i + (cross - t.start), -0.49, N - 0.51) : t.cur);
   requestFrame();
 }, { passive:false });
 
+const upEarly = new Set();
 function end(e){
-  const t = touches.get(e.pointerId); if (!t) return;
+  const t = touches.get(e.pointerId);
+  if (!t){ if (e.type !== 'lostpointercapture') upEarly.add(e.pointerId); return; }
   if (t.kind === 'strip'){ t.voice.release(); recordNoteOff(t); }
   touches.delete(e.pointerId); requestFrame();
 }
@@ -1044,7 +1137,9 @@ function releaseAll(){ touches.forEach(t => { if (t.kind === 'strip') t.voice.re
 canvas.addEventListener('pointerup', end);
 canvas.addEventListener('pointercancel', end);
 canvas.addEventListener('lostpointercapture', end);
-canvas.addEventListener('touchstart', e => e.preventDefault(), { passive:false });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); trackTouches(e); }, { passive:false });
+canvas.addEventListener('touchmove', trackTouches, { passive:true });
+canvas.addEventListener('touchend', dropTouches); canvas.addEventListener('touchcancel', dropTouches);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('gesturestart', e => e.preventDefault());
 /* ---------------- sleep and wake ----------------
@@ -1168,7 +1263,12 @@ function frame(now){
     if (t.kind !== 'strip') return;
     const s = strips[t.cur]; if (!s) return;
     rr(g, s.x, s.y, s.w, s.h, 8); g.fillStyle = `rgba(191,239,255,${0.05 + 0.08 * t.press})`; g.fill();
-    const R = S * (5 + 7 * t.press);
+    // pressure ring: the arc fills with pressure
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = 'rgba(255,179,92,0.9)'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.arc(t.x, t.y, S * 4.2, -Math.PI / 2, -Math.PI / 2 + t.press * Math.PI * 2); g.stroke();
+    g.globalCompositeOperation = 'lighter';
+    const R = S * (3 + 11 * t.press);
     const grd = g.createRadialGradient(t.x, t.y, 0, t.x, t.y, R * 1.6);
     grd.addColorStop(0, `rgba(200,245,255,${0.28 * t.press + 0.08})`); grd.addColorStop(1, 'rgba(200,245,255,0)');
     g.fillStyle = grd; g.beginPath(); g.arc(t.x, t.y, R * 1.6, 0, 6.2832); g.fill();
@@ -1201,6 +1301,7 @@ function renderSteps(){
     el.classList.toggle('mv', !!(melody[i] && melody[i].mv && melody[i].mv.length) || toneAuto.slice(i * 4, i * 4 + 4).some(v => v !== null));
     el.classList.toggle('now', seq.playing && i === seq.current);
   });
+  gridPlayhead();
 }
 function renderTransport(){
   $('#playBtn').setAttribute('aria-pressed', String(seq.playing));
@@ -1212,6 +1313,12 @@ function renderTransport(){
   $('#metroBtn').setAttribute('aria-pressed', String(state.metro));
 }
 function setNote(m){ lastNote = nameOf(m); renderStatus(); }
+let pressTimer = 0;
+function showPress(p){
+  const el = $('#pressOut'); if (!el) return;
+  el.textContent = 'tryck ' + Math.round(p * 100) + ' %'; el.hidden = false;
+  clearTimeout(pressTimer); pressTimer = setTimeout(() => { el.hidden = true; }, 1200);
+}
 function renderStatus(){
   statusEl.innerHTML = `<strong>${NOTE_NAMES[state.key]} ${state.scale.toLowerCase()}</strong> · ${PRESETS[state.sound].name} · ${KITS[state.kit].name}` +
     (lastNote ? ` · <span class="note">${lastNote}</span>` : '');
@@ -1240,6 +1347,11 @@ function renderSheet(){
     save(); renderSteps();
   });
   renderGroove();
+  $('#sensRange').value = state.pressSens; $('#sensOut').textContent = Math.round(state.pressSens * 100) + ' %';
+  seg($('#padVelSeg'), [['tryck', 'Tryck'], ['position', 'Position i paden'], ['fast', 'Fast']], state.padVel, v => { state.padVel = v; changed(false); });
+  $('#pressDiag').textContent = calib.n > 5
+    ? `Uppmätt fingeryta hittills: ${Math.round(calib.lo)}–${Math.round(calib.hi)} px. Ringen runt fingret visar trycket. Med Apple Pencil är trycket äkta. Om trycket inte märks på trummor, välj Position i paden: mitten slår hårdast.`
+    : 'Spela ett tag så lär sig appen hur lätt och hårt du trycker. Ringen runt fingret visar trycket. Med Apple Pencil är trycket äkta.';
   seg($('#lenSeg'), [[16, '16 steg · 1 takt'], [32, '32 steg · 2 takter']], state.steps, v => {
     if (v === 32 && state.steps === 16 && secondHalfEmpty()) copyFirstHalf();
     state.steps = v; changed(false); renderSteps();
@@ -1341,8 +1453,75 @@ function renderTracks(){
   });
 }
 let trkTab = 'mixer', mixLeds = [];
-function renderTrkTabs(){ seg($('#trkTabs'), [['mixer', 'Mixer'], ['list', 'Spår och ljud']], trkTab, v => { trkTab = v; renderTrkTabs(); showTrk(); }); }
-function showTrk(){ $('#mixerView').hidden = trkTab !== 'mixer'; $('#listView').hidden = trkTab !== 'list'; trkTab === 'mixer' ? renderMixer() : renderTracks(); }
+function renderTrkTabs(){ seg($('#trkTabs'), [['mixer', 'Mixer'], ['grid', 'Steg'], ['list', 'Spår och ljud']], trkTab, v => { trkTab = v; renderTrkTabs(); showTrk(); }); }
+function showTrk(){
+  $('#mixerView').hidden = trkTab !== 'mixer'; $('#gridView').hidden = trkTab !== 'grid'; $('#listView').hidden = trkTab !== 'list';
+  if (trkTab === 'mixer') renderMixer(); else if (trkTab === 'grid'){ gridPat = cur; renderGrid(); } else renderTracks();
+}
+
+/* ---------------- step editor ---------------- */
+let gridPat = 0, gridVel = 0.8, gridCols = [], gridNow = -1;
+const VELS = [[0.45, 'Svag'], [0.8, 'Normal'], [1, 'Stark']];
+function gridSlot(){ syncSlot(); return patterns[gridPat]; }
+function renderGrid(){
+  seg($('#gridPat'), PAT_NAMES.split('').map((n, i) => [i, n]), gridPat, i => { gridPat = i; renderGrid(); });
+  seg($('#gridVel'), VELS, gridVel, v => { gridVel = v; renderGrid(); });
+  const P = gridSlot(), n = P.steps, el = $('#grid');
+  el.style.gridTemplateColumns = `72px repeat(${n}, 26px)`;
+  el.innerHTML = ''; gridCols = Array.from({ length:n }, () => []); gridNow = -1;
+  const head = document.createElement('span'); head.className = 'gl'; head.textContent = PAT_NAMES[gridPat] + (gridPat === cur ? ' · spelas' : ''); el.append(head);
+  for (let s = 0; s < n; s++){ const c = document.createElement('span'); c.className = 'gn' + (s % 4 === 0 ? ' beat' : ''); c.textContent = s + 1; el.append(c); gridCols[s].push(c); }
+  const rows = [{ key:'mel', name:'MELODI' }].concat(DRUMS.map((d, i) => ({ key:i, name:d.name })));
+  rows.forEach(r => {
+    const used = r.key === 'mel' ? P.melody.slice(0, n).some(Boolean) : P.pattern.slice(0, n).some(st => st.some(x => x[0] === r.key));
+    const lab = document.createElement('span'); lab.className = 'gl' + (used ? ' used' : ''); lab.textContent = r.name; el.append(lab);
+    for (let s = 0; s < n; s++){
+      const c = document.createElement('button'); c.type = 'button'; c.dataset.k = r.key; c.dataset.s = s;
+      c.className = 'gc' + (r.key === 'mel' ? ' m' : '') + (s % 4 === 0 ? ' beat' : '');
+      paintCell(c, P);
+      el.append(c); gridCols[s].push(c);
+    }
+  });
+  gridPlayhead();
+}
+function paintCell(c, P){
+  const s = +c.dataset.s, k = c.dataset.k;
+  if (k === 'mel'){
+    const note = P.melody[s];
+    c.classList.toggle('on', !!note);
+    c.textContent = note ? NOTE_NAMES[((noteOf(note.i) % 12) + 12) % 12] : '';
+    c.setAttribute('aria-label', `Melodi steg ${s + 1}` + (note ? ', ton, tryck för att ta bort' : ', tom'));
+  } else {
+    const hit = P.pattern[s].find(x => x[0] === +k);
+    c.classList.toggle('on', !!hit);
+    c.style.setProperty('--v', hit ? (0.35 + 0.65 * hit[1]).toFixed(2) : '1');
+    c.setAttribute('aria-label', `${DRUMS[+k].name} steg ${s + 1}` + (hit ? ', slag' : ', tom'));
+  }
+}
+$('#grid').addEventListener('click', e => {
+  const c = e.target.closest('.gc'); if (!c) return;
+  const P = gridSlot(), s = +c.dataset.s, k = c.dataset.k;
+  if (k === 'mel'){
+    if (!P.melody[s]){ toast('Nya toner spelar du in på strängarna med ●.'); return; }
+    P.melody[s] = null;
+  } else {
+    const idx = +k, at = P.pattern[s].findIndex(x => x[0] === idx);
+    if (at >= 0) P.pattern[s].splice(at, 1);
+    else { P.pattern[s].push([idx, gridVel]); ensureAudio(); playDrum(idx, ac.currentTime + 0.005, gridVel); padFlash[idx] = 1; requestFrame(); }
+  }
+  paintCell(c, P);
+  const lab = c.parentNode.children[[...c.parentNode.children].indexOf(c) - s - 1];
+  if (lab) lab.classList.toggle('used', k === 'mel' ? P.melody.slice(0, P.steps).some(Boolean) : P.pattern.slice(0, P.steps).some(st => st.some(x => x[0] === +k)));
+  save(); renderSteps();
+});
+function gridPlayhead(){
+  if ($('#tracks').hidden || trkTab !== 'grid' || !gridCols.length) return;
+  const s = seq.playing && gridPat === cur ? seq.current : -1;
+  if (s === gridNow) return;
+  if (gridNow >= 0 && gridCols[gridNow]) gridCols[gridNow].forEach(c => c.classList.remove('now'));
+  if (s >= 0 && gridCols[s]) gridCols[s].forEach(c => c.classList.add('now'));
+  gridNow = s;
+}
 
 function fader(ch, onChange, onRelease){
   const f = document.createElement('div'); f.className = 'fader'; f.tabIndex = 0; f.setAttribute('role', 'slider');
@@ -1621,6 +1800,9 @@ $('#saveForm').addEventListener('submit', e => {
 $('#songsBtn').addEventListener('click', () => { renderSongs(); $('#songsSheet').hidden = false; });
 $('#closeSongs').addEventListener('click', () => { $('#songsSheet').hidden = true; });
 $('#songsSheet').addEventListener('click', e => { if (e.target.id === 'songsSheet') $('#songsSheet').hidden = true; });
+
+$('#sensRange').addEventListener('input', e => { state.pressSens = +e.target.value; $('#sensOut').textContent = Math.round(state.pressSens * 100) + ' %'; save(); });
+$('#calibReset').addEventListener('click', () => { calib = { lo:20, hi:38, n:0 }; try { localStorage.removeItem('glimt-calib'); } catch (e) {} renderSheet(); toast('Trycket kalibreras om medan du spelar.'); });
 
 let toneDrag = false, lastToneSlot = -1, lastToneAt = 0;
 function setTone(v, fromAuto){
