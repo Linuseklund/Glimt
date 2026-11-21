@@ -84,6 +84,9 @@ body{
 .step.has.now{background:#fff3e3;box-shadow:0 0 10px rgba(255,179,92,.9)}
 .step.mel{box-shadow:inset 0 -5px 0 rgba(191,239,255,.85)}
 .step.mel.now{box-shadow:0 0 10px rgba(191,239,255,.9), inset 0 -5px 0 #ffffff}
+.step.mv{outline:1px solid rgba(255,255,255,.6);outline-offset:1px}
+#metroBtn[aria-pressed="true"]{border-color:var(--led);color:var(--led)}
+#metroBtn.tick{background:var(--led);color:#05222c}
 .seqbar .break{display:none}
 .tone{display:flex;align-items:center;gap:6px;flex:none;font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .tone input{width:96px;height:28px;accent-color:var(--led)}
@@ -173,7 +176,10 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
     <button class="btn icon" id="playBtn" aria-label="Spela komp" aria-pressed="false">
       <svg id="playIcon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
     </button>
-    <button class="btn icon" id="recBtn" aria-label="Spela in trummor" aria-pressed="false"><span class="recdot"></span></button>
+    <button class="btn icon" id="recBtn" aria-label="Spela in" aria-pressed="false"><span class="recdot"></span></button>
+    <button class="btn icon" id="metroBtn" aria-label="Metronom" aria-pressed="false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 3h6l4 18H5z"/><path d="M12 16l5-9"/><path d="M8 16h8"/></svg>
+    </button>
     <span class="break"></span>
     <div class="steps" id="steps" aria-hidden="true"></div>
     <label class="tone" for="toneRange">Klang <input type="range" id="toneRange" min="-1" max="1" step="0.01" aria-label="Klang för den inspelade slingan"></label>
@@ -183,7 +189,9 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <div class="oct"><small>BPM</small><span id="bpmLabel">100</span></div>
       <button class="btn" id="bpmUp" aria-label="Snabbare">+</button>
     </div>
-    <button class="btn" id="clearBtn">Rensa</button>
+    <button class="btn icon" id="clearBtn" aria-label="Rensa allt inspelat" title="Rensa allt">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+    </button>
   </div>
 
   <main class="deck"><canvas id="surface" aria-label="Spelyta: strängar och trumpads"></canvas></main>
@@ -198,7 +206,7 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <li><b>Glid</b><span>Dra åt sidan för att böja tonen, eller vicka för vibrato.</span></li>
       <li><b>Längs</b><span>Längre ut på strängen blir klangen ljusare.</span></li>
       <li><b>Trummor</b><span>Övre raden, eller hela ytan som 4×4 under Ljud → Yta.</span></li>
-      <li><b>Komp</b><span>▶ spelar slingan. Tryck ● och spela trummor eller strängar för att spela in. Håll kvar en ton medan du trycker nästa för slide.</span></li>
+      <li><b>Komp</b><span>▶ spelar slingan. Tryck ● och spela trummor eller strängar för att spela in. Håll kvar en ton medan du trycker nästa för slide. Glid, tryck och Klang spelas också in.</span></li>
     </ul>
     <button class="btn go" id="startBtn">Starta</button>
     <p class="tip">Hör du inget på iPhone? Slå av ljudlöst läge. Lägg till sidan på hemskärmen (Dela → Lägg till på hemskärmen) för helskärm.</p>
@@ -225,6 +233,15 @@ input[type=range]{width:100%;accent-color:var(--led);height:28px}
       <p class="hint">Ersätter trummönstret. Acid laddar även en basslinga. Du kan sedan spela in mer ovanpå.</p></div>
     <div class="field"><span class="label">Rensa</span><div class="seg" id="clearSeg"></div></div>
     <div class="field"><label class="label" for="bpmRange">Tempo <output id="bpmOut"></output></label><input type="range" id="bpmRange" min="60" max="180" step="1"></div>
+    <div class="row2">
+      <div class="field"><label class="label" for="swingRange">Swing <output id="swingOut"></output></label><input type="range" id="swingRange" min="0" max="1" step="0.01"></div>
+      <div class="field"><label class="label" for="humanRange">Humanize <output id="humanOut"></output></label><input type="range" id="humanRange" min="0" max="1" step="0.01"></div>
+    </div>
+    <div class="row2">
+      <label class="switch" for="metroChk">Metronom <input type="checkbox" id="metroChk"></label>
+      <label class="switch" for="metroRecChk">Bara vid inspelning <input type="checkbox" id="metroRecChk"></label>
+    </div>
+    <p class="hint">Med ● påslaget spelas även rörelser in: hur fingret glider och trycker under en ton, och hur du drar i Klang. Steg med rörelser får en vit ram.</p>
 
     <h3>Mix</h3>
     <div class="row2">
@@ -277,7 +294,8 @@ const SURFACES = { delad:'Strängar + trummor', strangar:'Bara strängar', trumm
 
 /* ---------------- settings ---------------- */
 const DEFAULTS = { key:9, scale:'Pentatonisk moll', sound:'glas', octave:3, strips:12, glide:true, reverb:0.35, volume:0.8,
-  surface:'delad', kit:'klassisk', bpm:100, tone:0, pattern:null, melody:null };
+  surface:'delad', kit:'klassisk', bpm:100, tone:0, swing:0, human:0, metro:false, metroRec:false,
+  pattern:null, melody:null, toneAuto:null };
 let state = { ...DEFAULTS };
 let stored = null;
 try { stored = JSON.parse(localStorage.getItem('glimt-settings') || 'null'); if (stored) state = { ...state, ...stored }; } catch (e) {}
@@ -292,7 +310,8 @@ state.bpm = clamp(+state.bpm || 100, 60, 180);
 function save(){
   try {
     const out = { ...state, pattern: pattern.map(st => st.map(n => [n[0], n[1]])),
-      melody: melody.map(n => n && { i:n.i, len:n.len, al:n.al, pr:n.pr, sl:n.sl }) };
+      melody: melody.map(n => n && { i:n.i, len:n.len, al:n.al, pr:n.pr, sl:n.sl, mv:n.mv || null }),
+      toneAuto };
     localStorage.setItem('glimt-settings', JSON.stringify(out));
   } catch (e) {}
 }
@@ -384,8 +403,8 @@ function makeVoice(f, along, press, when){
   vca.gain.setTargetAtTime(p.s, t + p.a, p.d / 3);
   return {
     setFreq(f, at, tc){ const n = Math.max(at ?? 0, ac.currentTime); oscs.forEach(o => o.frequency.setTargetAtTime(f, n, tc ?? 0.006)); },
-    setTone(along, press){
-      const n = ac.currentTime;
+    setTone(along, press, at){
+      const n = Math.max(at ?? 0, ac.currentTime);
       filt.frequency.setTargetAtTime(cutoff(p, along, press), n, 0.02);
       amp.gain.setTargetAtTime(pressGain(press), n, 0.03);
       if (p.fenv) filt.Q.setTargetAtTime(p.q * (0.75 + 0.45 * press), n, 0.05);
@@ -462,8 +481,17 @@ const emptyMelody = () => new Array(16).fill(null);
 let melody = emptyMelody();
 if (Array.isArray(state.melody) && state.melody.length === 16)
   melody = state.melody.map(n => n && Number.isFinite(+n.i)
-    ? { i:+n.i | 0, len:clamp(+n.len | 0 || 1, 1, 16), al:clamp(+n.al || 0.4, 0, 1), pr:clamp(+n.pr || 0.7, 0.1, 1), sl:!!n.sl } : null);
+    ? { i:+n.i | 0, len:clamp(+n.len | 0 || 1, 1, 16), al:clamp(+n.al || 0.4, 0, 1), pr:clamp(+n.pr || 0.7, 0.1, 1), sl:!!n.sl,
+        mv:Array.isArray(n.mv) ? n.mv.filter(a => Array.isArray(a) && a.length === 4 && a.every(Number.isFinite)).slice(0, 256) : null } : null);
 delete state.melody;
+/* recorded movements of the Klang control: 64 slots per loop (four per step), null = no movement recorded */
+const emptyToneAuto = () => new Array(64).fill(null);
+let toneAuto = emptyToneAuto();
+if (Array.isArray(state.toneAuto) && state.toneAuto.length === 64)
+  toneAuto = state.toneAuto.map(v => Number.isFinite(v) ? clamp(v, -1, 1) : null);
+delete state.toneAuto;
+state.swing = clamp(+state.swing || 0, 0, 1);
+state.human = clamp(+state.human || 0, 0, 1);
 const toneAl = al => clamp(al + state.tone * 0.6, 0, 1);
 const ACID_LINE = [
   [0, 0, 1, .30, .95], [2, 0, 1, .22, .5], [3, 5, 1, .38, .9, 1], [4, 0, 1, .22, .5],
@@ -484,43 +512,81 @@ const seq = { playing:false, rec:false, nextTime:0, absStep:0, timer:0, current:
 let visQueue = [], seqVoice = null;
 const stepDur = () => 60 / state.bpm / 4;
 
+/* groove: swing delays every second 16th by up to half a step (a 75 % swing ratio);
+   humanize nudges timing by up to ±12 ms and velocity by up to ±25 % */
+const jitter = () => (Math.random() * 2 - 1) * state.human;
+const swung = (T, s, dur) => s % 2 ? T + state.swing * 0.5 * dur : T;
+
+function click(t, accent){
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = accent ? 1760 : 1175;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(accent ? 0.45 : 0.28, t + 0.001); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.05);
+}
 function scheduleMelody(s, T, dur){
   const mn = melody[s];
   let play = !!mn;
   if (mn && mn.skip){ mn.skip = 0; play = false; }
+  let Tn = T;
   if (play && mn.sl && seqVoice){
     // slide: keep the same voice, glide its pitch, no new filter hit
     seqVoice.v.setFreq(freq(noteOf(mn.i)), T, 0.035);
     seqVoice.end = T + mn.len * dur - 0.012; seqVoice.al = mn.al; seqVoice.pr = mn.pr;
-    seqVoice.v.setTone(toneAl(mn.al), mn.pr);
+    seqVoice.v.setTone(toneAl(mn.al), mn.pr, T);
   } else {
     if (seqVoice && (play || seqVoice.end <= T + 1e-4)){ seqVoice.v.release(Math.min(seqVoice.end, T)); seqVoice = null; }
-    if (play) seqVoice = { v:makeVoice(freq(noteOf(mn.i)), toneAl(mn.al), mn.pr, T), end:T + mn.len * dur - 0.012, al:mn.al, pr:mn.pr };
+    if (play){
+      Tn = Math.max(ac.currentTime, T + jitter() * 0.01);
+      const pr = clamp(mn.pr * (1 + jitter() * 0.15), 0.1, 1);
+      seqVoice = { v:makeVoice(freq(noteOf(mn.i)), toneAl(mn.al), pr, Tn), end:Tn + mn.len * dur - 0.012, al:mn.al, pr };
+    }
   }
-  if (play) visQueue.push({ time:T, strip:mn.i, al:mn.al, v:mn.pr });
+  if (!play) return;
+  visQueue.push({ time:Tn, strip:mn.i, al:mn.al, v:mn.pr });
+  // replay the finger's recorded movement: bend, position along the strip and pressure
+  if (mn.mv) for (const [rt, pos, al, pr] of mn.mv){
+    if (rt >= mn.len) break;
+    const at = Tn + rt * dur;
+    seqVoice.v.setFreq(freq(noteAt(pos)), at, 0.012);
+    seqVoice.v.setTone(toneAl(al), pr, at);
+    seqVoice.al = al;
+    visQueue.push({ time:at, strip:clamp(Math.round(pos), 0, 31), al, v:pr * 0.8 });
+  }
 }
 function scheduleSeq(){
   if (!seq.playing) return;
   while (seq.nextTime < ac.currentTime + 0.12){
-    const s = seq.absStep % 16, T = seq.nextTime, dur = stepDur();
+    const s = seq.absStep % 16, T0 = seq.nextTime, dur = stepDur(), T = swung(T0, s, dur);
     for (const n of pattern[s]){
       if (n[2]){ n[2] = 0; continue; }
-      DRUMS[n[0]].play(T, n[1]);
-      visQueue.push({ time:T, idx:n[0], v:n[1] });
+      const ht = Math.max(ac.currentTime, T + jitter() * 0.012), hv = clamp(n[1] * (1 + jitter() * 0.25), 0.05, 1);
+      DRUMS[n[0]].play(ht, hv);
+      visQueue.push({ time:ht, idx:n[0], v:hv });
     }
     scheduleMelody(s, T, dur);
-    visQueue.push({ time:T, step:s });
+    if (s % 4 === 0 && state.metro && (!state.metroRec || seq.rec)){ click(T0, s === 0); visQueue.push({ time:T0, metro:true }); }
+    for (let q = 0; q < 4; q++){ const v = toneAuto[s * 4 + q]; if (v !== null) visQueue.push({ time:T0 + q * dur / 4, tone:v }); }
+    visQueue.push({ time:T0, step:s });
     seq.absStep++;
     seq.nextTime += dur;
   }
+  visQueue.sort((a, b) => a.time - b.time);
 }
 function seqPos(t){ return seq.absStep - (seq.nextTime - t) / stepDur(); }
 function recordNoteOn(t, i, along, press, legato){
   if (!seq.playing || !seq.rec) return;
   const pos = seqPos(ac.currentTime), k = Math.round(pos), s = ((k % 16) + 16) % 16;
-  melody[s] = { i, len:1, al:along, pr:press, sl:legato, skip:k >= seq.absStep ? 1 : 0 };
+  melody[s] = { i, len:1, al:along, pr:press, sl:legato, mv:null, skip:k >= seq.absStep ? 1 : 0, src:t };
   t.recStep = s; t.recPos = pos;
   save(); renderSteps();
+}
+function recordMove(t, pos){
+  if (t.recStep === undefined || !seq.playing || !seq.rec) return;
+  const n = melody[t.recStep]; if (!n || n.src !== t) return;
+  const rel = seqPos(ac.currentTime) - t.recPos;
+  if (rel < 0 || rel >= 16 || rel - (t.lastRel ?? -1) < 0.12) return;
+  t.lastRel = rel;
+  if (!n.mv) n.mv = [];
+  if (n.mv.length < 256) n.mv.push([+rel.toFixed(3), +pos.toFixed(3), +t.along.toFixed(3), +t.press.toFixed(3)]);
 }
 function recordNoteOff(t){
   if (t.recStep === undefined || !seq.playing) return;
@@ -733,6 +799,7 @@ canvas.addEventListener('pointermove', e => {
   else { t.cur = clamp(Math.round(cross), 0, N - 1); m = noteOf(t.cur); }
   if (Math.abs(m - t.m) > 0.001){ t.m = m; t.voice.setFreq(freq(m)); }
   t.voice.setTone(t.along, t.press);
+  recordMove(t, state.glide ? clamp(t.i + (cross - t.start), -0.49, N - 0.51) : t.cur);
   requestFrame();
 }, { passive:false });
 
@@ -762,6 +829,8 @@ function frame(now){
       const ev = visQueue.shift();
       if (ev.step !== undefined){ seq.current = ev.step; renderSteps(); }
       else if (ev.strip !== undefined) stripGlow[ev.strip] = { f:0.55 + 0.45 * ev.v, al:toneAl(ev.al) };
+      else if (ev.tone !== undefined){ if (!toneDrag) setTone(ev.tone, true); }
+      else if (ev.metro){ const mb = $('#metroBtn'); mb.classList.add('tick'); setTimeout(() => mb.classList.remove('tick'), 90); }
       else padFlash[ev.idx] = Math.max(padFlash[ev.idx], 0.4 + 0.6 * ev.v);
     }
   }
@@ -838,6 +907,7 @@ function renderSteps(){
   [...stepsEl.children].forEach((el, i) => {
     el.classList.toggle('has', pattern[i].length > 0);
     el.classList.toggle('mel', !!melody[i]);
+    el.classList.toggle('mv', !!(melody[i] && melody[i].mv && melody[i].mv.length) || toneAuto.slice(i * 4, i * 4 + 4).some(v => v !== null));
     el.classList.toggle('now', seq.playing && i === seq.current);
   });
 }
@@ -848,6 +918,7 @@ function renderTransport(){
   $('#recBtn').setAttribute('aria-pressed', String(seq.rec));
   $('#bpmLabel').textContent = state.bpm;
   $('#toneRange').value = state.tone;
+  $('#metroBtn').setAttribute('aria-pressed', String(state.metro));
 }
 function setNote(m){ lastNote = nameOf(m); renderStatus(); }
 function renderStatus(){
@@ -871,11 +942,15 @@ function renderSheet(){
   seg($('#stripSeg'), [[8,'8'],[12,'12'],[16,'16']], state.strips, v => { state.strips = v; changed(true); });
   seg($('#kitSeg'), Object.entries(KITS).map(([k, p]) => [k, p.name]), state.kit, v => { state.kit = v; applyKit(); changed(false); });
   seg($('#beatSeg'), Object.entries(BEATS).map(([k, b]) => [k, b.name]), undefined, v => loadBeat(v));
-  seg($('#clearSeg'), [['drums', 'Trummor'], ['mel', 'Melodi'], ['all', 'Allt']], undefined, v => {
-    if (v !== 'mel') pattern = emptyPattern();
-    if (v !== 'drums') melody = emptyMelody();
+  seg($('#clearSeg'), [['drums', 'Trummor'], ['mel', 'Melodi'], ['moves', 'Rörelser'], ['all', 'Allt']], undefined, v => {
+    if (v === 'drums' || v === 'all') pattern = emptyPattern();
+    if (v === 'mel' || v === 'all') melody = emptyMelody();
+    if (v === 'moves' || v === 'all'){ toneAuto = emptyToneAuto(); melody.forEach(n => { if (n) n.mv = null; }); }
     save(); renderSteps();
   });
+  $('#swingRange').value = state.swing; $('#swingOut').textContent = Math.round(50 + state.swing * 25) + ' %';
+  $('#humanRange').value = state.human; $('#humanOut').textContent = Math.round(state.human * 100) + ' %';
+  $('#metroChk').checked = state.metro; $('#metroRecChk').checked = state.metroRec;
   const sel = $('#scaleSel');
   if (!sel.options.length) Object.keys(SCALES).forEach(k => { const o = document.createElement('option'); o.value = o.textContent = k; sel.appendChild(o); });
   sel.value = state.scale;
@@ -898,12 +973,33 @@ $('#bpmUp').addEventListener('click', () => { setBpm(state.bpm + 2); $('#bpmRang
 $('#playBtn').addEventListener('click', () => { seq.playing ? stopSeq() : startSeq(); });
 $('#recBtn').addEventListener('click', () => { seq.rec = !seq.rec; if (seq.rec && !seq.playing) startSeq(); renderTransport(); });
 $('#clearBtn').addEventListener('click', () => { pattern = emptyPattern(); melody = emptyMelody(); save(); renderSteps(); });
-function setTone(v){
-  state.tone = clamp(v, -1, 1); save();
+let toneDrag = false, lastToneSlot = -1, lastToneAt = 0;
+function setTone(v, fromAuto){
+  state.tone = clamp(v, -1, 1);
+  if (fromAuto) $('#toneRange').value = state.tone;
+  else { save(); recordTone(); }
   if (seqVoice) seqVoice.v.setTone(toneAl(seqVoice.al), seqVoice.pr);
+}
+function recordTone(){
+  if (!seq.playing || !seq.rec) return;
+  const slot = ((Math.floor(seqPos(ac.currentTime) * 4) % 64) + 64) % 64, now = performance.now();
+  if (lastToneSlot >= 0 && now - lastToneAt < 300){
+    // fill the slots skipped since the last input so a quick sweep stays continuous
+    for (let k = (lastToneSlot + 1) % 64, guard = 0; k !== slot && guard < 12; k = (k + 1) % 64, guard++) toneAuto[k] = state.tone;
+  }
+  toneAuto[slot] = state.tone; lastToneSlot = slot; lastToneAt = now;
+  save(); renderSteps();
 }
 $('#toneRange').addEventListener('input', e => setTone(+e.target.value));
 $('#toneRange').addEventListener('dblclick', e => { e.target.value = 0; setTone(0); });
+$('#toneRange').addEventListener('pointerdown', () => { toneDrag = true; lastToneSlot = -1; });
+window.addEventListener('pointerup', () => { toneDrag = false; });
+window.addEventListener('pointercancel', () => { toneDrag = false; });
+$('#swingRange').addEventListener('input', e => { state.swing = +e.target.value; $('#swingOut').textContent = Math.round(50 + state.swing * 25) + ' %'; save(); });
+$('#humanRange').addEventListener('input', e => { state.human = +e.target.value; $('#humanOut').textContent = Math.round(state.human * 100) + ' %'; save(); });
+$('#metroChk').addEventListener('change', e => { state.metro = e.target.checked; changed(false); });
+$('#metroRecChk').addEventListener('change', e => { state.metroRec = e.target.checked; if (e.target.checked) state.metro = true; changed(false); });
+$('#metroBtn').addEventListener('click', () => { ensureAudio(); state.metro = !state.metro; changed(false); });
 $('#settingsBtn').addEventListener('click', () => { renderSheet(); $('#sheet').hidden = false; });
 $('#closeSheet').addEventListener('click', () => { $('#sheet').hidden = true; });
 $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') $('#sheet').hidden = true; });
